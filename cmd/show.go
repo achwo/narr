@@ -15,27 +15,34 @@ var showCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		tags, _ := cmd.Flags().GetStringSlice("tag")
 
-		path, err := utils.GetValidFilePathFromArgs(args, 0)
+		path, err := utils.GetValidFullpathFromArgs(args, 0)
 		if err != nil {
 			return fmt.Errorf("could not resolve path %s: %w", args[0], err)
 		}
 
-		metadata, err := utils.ReadMetadata(path)
+		files, err := utils.GetFilesByExtension(path, ".m4b")
 		if err != nil {
-			return fmt.Errorf("failed to read metadata of %s: %w", path, err)
+			return fmt.Errorf("failed to read files within %s: %w", path, err)
 		}
 
-		if len(tags) > 0 {
-			tagValues := utils.GetMetadataTagValues(metadata, tags)
-
-			for _, value := range tagValues {
-				fmt.Println(value.String())
+		for _, file := range files {
+			metadata, err := utils.ReadMetadata(file)
+			if err != nil {
+				return fmt.Errorf("failed to read metadata of %s: %w", file, err)
 			}
 
-			return nil
-		}
+			fmt.Println("#", file)
+			if len(tags) > 0 {
+				tagValues := utils.GetMetadataTagValues(metadata, tags)
 
-		fmt.Println(metadata)
+				for _, value := range tagValues {
+					fmt.Println(value.String())
+				}
+			} else {
+				fmt.Println(metadata)
+			}
+			fmt.Println("")
+		}
 
 		return nil
 	},
