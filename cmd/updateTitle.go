@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"errors"
 	"fmt"
 	"github.com/achwo/narr/utils"
 	"io/fs"
@@ -25,23 +24,9 @@ var updateTitleCmd = &cobra.Command{
 	`,
 	Example: `narr updateTitle --regex "^(\\d+)/(.+)$" "Die drei ???" folderWithM4B`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if len(args) < 1 {
-			return errors.New("you must specify a folder")
-		}
-
-		folder := args[0]
-		fullpath, err := filepath.Abs(folder)
+		fullpath, err := utils.GetValidDirPathFromArgs(args, 0)
 		if err != nil {
-			return fmt.Errorf("failed to get absolute path of folder %s: %w", folder, err)
-		}
-
-		file, err := os.Stat(fullpath)
-		if err != nil {
-			return err
-		}
-
-		if !file.IsDir() {
-			return fmt.Errorf("%s is not a directory", folder)
+			return fmt.Errorf("could not resolve path %s: %w", args[0], err)
 		}
 
 		return updateTitle(fullpath)

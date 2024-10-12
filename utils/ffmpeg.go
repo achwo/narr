@@ -16,9 +16,6 @@ func ReadMetadata(path string) (string, error) {
 		return "", fmt.Errorf("failed to extract metadata for file %s: %w", path, err)
 	}
 
-	fmt.Println("Extracted metadata:")
-	fmt.Println(metadata.String())
-
 	return metadata.String(), nil
 }
 
