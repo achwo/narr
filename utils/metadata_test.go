@@ -1,7 +1,6 @@
 package utils
 
 import (
-	"fmt"
 	"reflect"
 	"regexp"
 	"testing"
@@ -31,7 +30,7 @@ func TestGetMetadataField(t *testing.T) {
 		{
 			name:     "field exists",
 			metadata: fullMetadata,
-			tags:     []string{"title", "album"},
+			tags:     []string{"title", "album", "date"},
 			expected: []TagWithValue{
 				{Tag: "title", Value: "102/Doppelte Bäumung"},
 				{Tag: "album", Value: "102/Doppelte Bäumung"},
@@ -61,9 +60,6 @@ func TestGetMetadataField(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := GetMetadataTagValues(tt.metadata, tt.tags)
-			if got == nil {
-				fmt.Println("foll null")
-			}
 			if !reflect.DeepEqual(got, tt.expected) {
 				t.Errorf("GetMetadataField() = %v, expected %v", got, tt.expected)
 			}
@@ -97,31 +93,30 @@ album_artist=Something With ???
 album=Folge 102: Doppelte Bäumung
 date=2002-03-11
 disc=1
-copyright=℗ 2002 Sony Music Entertainment GmbH
 track=1
 encoder=Lavf61.7.100`,
 		},
 		{
 			name: "field exists but does not match regex",
 			metadata: `;FFMETADATA1
-title=NoMatch Bäumung
-album=NoMatch Bäumung`,
+		title=NoMatch Bäumung
+		album=NoMatch Bäumung`,
 			tags:   []string{"album", "title"},
 			regex:  regexp.MustCompile(`^(\d+)/(.+)$`),
 			format: "Folge %s: %s",
 			expected: `;FFMETADATA1
-title=NoMatch Bäumung
-album=NoMatch Bäumung`,
+		title=NoMatch Bäumung
+		album=NoMatch Bäumung`,
 		},
 		{
 			name: "field does not exist",
 			metadata: `;FFMETADATA1
-title=102/Doppelte Bäumung`,
+		title=102/Doppelte Bäumung`,
 			tags:   []string{"album"},
 			regex:  regexp.MustCompile(`^(\d+)/(.+)$`),
 			format: "Folge %s: %s",
 			expected: `;FFMETADATA1
-title=102/Doppelte Bäumung`,
+		title=102/Doppelte Bäumung`,
 		},
 		{
 			name: "multiple fields, only one matches regex",
@@ -134,6 +129,14 @@ album=Other Bäumung`,
 			expected: `;FFMETADATA1
 title=Folge 102: Doppelte Bäumung
 album=Other Bäumung`,
+		},
+		{
+			name:     "only one format string",
+			metadata: `title=Und der freiTag`,
+			tags:     []string{"title"},
+			regex:    regexp.MustCompile(`^Und(.+)$`),
+			format:   "und%s",
+			expected: `title=und der freiTag`,
 		},
 	}
 

@@ -65,14 +65,20 @@ func UpdateMetadataTags(
 	var affectedLines []Diff
 	tagsWithValue := GetMetadataTagValues(metadata, tags)
 
+	expectedMatchLen := strings.Count(format, "%s")
+
 	for _, currentValue := range tagsWithValue {
 		if regex.MatchString(currentValue.Value) {
 			matches := regex.FindStringSubmatch(currentValue.Value)
 
-			if len(matches) == 3 {
-				episode := matches[1]
-				title := matches[2]
-				newValue := fmt.Sprintf(format, episode, title)
+			if len(matches) == expectedMatchLen+1 {
+				captureGroups := matches[1:]
+
+				args := make([]interface{}, len(captureGroups))
+				for i, v := range captureGroups {
+					args[i] = v
+				}
+				newValue := fmt.Sprintf(format, args...)
 
 				metadata = strings.ReplaceAll(
 					metadata,

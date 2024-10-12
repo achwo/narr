@@ -13,52 +13,66 @@ var editCmd = &cobra.Command{
 	Short:   "The metadata tags for given audio file",
 	Example: "narr metadata edit [file]",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		dryRun, _ := cmd.Flags().GetBool("dry-run")
+		dryRun, _ := cmd.Flags().GetBool("dryRun")
 		verbose, _ := cmd.Flags().GetBool("verbose")
 		regexStr, _ := cmd.Flags().GetString("regex")
 		tags, _ := cmd.Flags().GetStringSlice("tag")
 		format, _ := cmd.Flags().GetString("format")
 
-		path, err := utils.GetValidFilePathFromArgs(args, 0)
+		path, err := utils.GetValidFullpathFromArgs(args, 0)
 		if err != nil {
 			return fmt.Errorf("could not resolve path %s: %w", args[0], err)
 		}
 
-		metadata, err := utils.ReadMetadata(path)
-		if err != nil {
-			return fmt.Errorf("failed to read metadata of %s: %w", path, err)
+		files, err := utils.GetFilesByExtension(path, ".m4b")
+
+		for _, file := range files {
+			metadata, err := utils.ReadMetadata(file)
+			if err != nil {
+				return fmt.Errorf("failed to read metadata of %s: %w", file, err)
+			}
+
+			regex, err := regexp.Compile(regexStr)
+			if err != nil {
+				return fmt.Errorf("error compiling regex: %v", err)
+			}
+
+			updatedMetadata, diffs := utils.UpdateMetadataTags(metadata, tags, regex, format)
+
+			if len(diffs) == 0 {
+				if verbose {
+					fmt.Println("#", file)
+					fmt.Println("Nothing to do.")
+				}
+				continue
+			}
+
+			fmt.Println("#", file)
+			if verbose {
+				fmt.Println("Metadata after update:")
+				fmt.Println(updatedMetadata)
+			}
+
+			for _, diff := range diffs {
+				fmt.Println(diff.Tag, ":", diff.Before, "->", diff.After)
+			}
+
+			if dryRun {
+				fmt.Println("")
+				continue
+			}
+
+			if verbose {
+				fmt.Println("Changing metadata in file", file)
+			}
+
+			if err = utils.WriteMetadata(file, updatedMetadata, verbose); err != nil {
+				return fmt.Errorf("could not write metadata: %w", err)
+			}
+
+			fmt.Println("Metadata successfully changed for file", file)
+			fmt.Println("")
 		}
-
-		regex, err := regexp.Compile(regexStr)
-		if err != nil {
-			return fmt.Errorf("error compiling regex: %v", err)
-		}
-
-		updatedMetadata, diffs := utils.UpdateMetadataTags(metadata, tags, regex, format)
-
-		if verbose {
-			fmt.Println("Metadata after update:")
-			fmt.Println(updatedMetadata)
-		}
-
-		for _, diff := range diffs {
-			fmt.Println(diff.Tag, ":", diff.Before, "->", diff.After)
-		}
-
-		if dryRun {
-			fmt.Println("Dry run: not changing the file")
-			return nil
-		}
-
-		if verbose {
-			fmt.Println("Changing metadata in file", path)
-		}
-
-		if err = utils.WriteMetadata(path, updatedMetadata, verbose); err != nil {
-			return fmt.Errorf("could not write metadata: %w", err)
-		}
-
-		fmt.Println("Metadata successfully changed for file", path)
 
 		return nil
 	},
@@ -67,7 +81,7 @@ var editCmd = &cobra.Command{
 func init() {
 	metadataCmd.AddCommand(editCmd)
 
-	editCmd.Flags().Bool("dry-run", false, "Skip applying the changes")
+	editCmd.Flags().Bool("dryRun", false, "Skip applying the changes")
 	editCmd.Flags().BoolP("verbose", "v", false, "More output")
 	editCmd.Flags().String("regex", "", "Regular expression to apply to album titles")
 	editCmd.MarkFlagRequired("regex")
