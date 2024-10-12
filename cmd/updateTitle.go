@@ -1,15 +1,13 @@
 package cmd
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"io/fs"
+	"narr/utils"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
-	"strings"
 
 	"github.com/spf13/cobra"
 )
@@ -83,14 +81,14 @@ func updateTitle(fullpath string) error {
 		return err
 	}
 	for _, file := range files {
-		metadata, err := readMetadata(file)
+		metadata, err := utils.ReadMetadata(file)
 		if err != nil {
 			continue
 		}
-		metadata = updateMetadataAlbum(metadata)
+		metadata = utils.UpdateMetadataAlbum(metadata, regex)
 		outputFile := file + ".tmp.m4b"
 
-		if err := writeMetadata(file, outputFile, metadata); err != nil {
+		if err := utils.WriteMetadata(file, outputFile, metadata); err != nil {
 			return fmt.Errorf("failed to write metadata to %s: %w", outputFile, err)
 		}
 	}
@@ -112,66 +110,4 @@ func getM4BFiles(fullpath string) ([]string, error) {
 	})
 
 	return m4bFiles, err
-}
-
-func readMetadata(path string) (string, error) {
-	extractCmd := exec.Command("ffmpeg", "-i", path, "-f", "ffmetadata", "-")
-
-	var oldMetadata bytes.Buffer
-	extractCmd.Stdout = &oldMetadata
-
-	if err := extractCmd.Run(); err != nil {
-		return "", fmt.Errorf("failed to extract metadata for file %s: %w", path, err)
-	}
-
-	fmt.Println("Extracted metadata:")
-	fmt.Println(oldMetadata.String())
-
-	return oldMetadata.String(), nil
-}
-
-func updateMetadataAlbum(metadata string) string {
-	if !strings.Contains(metadata, "album=") {
-		fmt.Println("Warning: No album tag found.")
-		return metadata
-	}
-	lines := strings.Split(metadata, "\n")
-
-	tags := []string{"album", "title"}
-
-	for i, line := range lines {
-		for _, tag := range tags {
-			fullTag := tag + "="
-			if strings.HasPrefix(line, fullTag) {
-				currentValue := strings.TrimPrefix(line, fullTag)
-
-				if regex.MatchString(currentValue) {
-					matches := regex.FindStringSubmatch(currentValue)
-
-					if len(matches) == 3 {
-						episode := matches[1]
-						title := matches[2]
-						currentValue = fmt.Sprintf("Folge %s: %s", episode, title)
-					}
-				}
-
-				lines[i] = fullTag + currentValue
-				break
-			}
-		}
-	}
-	newMetadata := strings.Join(lines, "\n")
-
-	fmt.Println("Modified metadata:")
-	fmt.Println(newMetadata)
-
-	return newMetadata
-}
-
-func writeMetadata(inputFile string, outputFile string, metadata string) error {
-	writeCmd := exec.Command("ffmpeg", "-i", inputFile, "-f", "ffmetadata", "-i", "-", "-map_metadata", "1", "-c", "copy", outputFile)
-
-	writeCmd.Stdin = bytes.NewReader([]byte(metadata))
-
-	return writeCmd.Run()
 }
