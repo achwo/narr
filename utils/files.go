@@ -3,6 +3,7 @@ package utils
 import (
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 )
@@ -55,4 +56,21 @@ func GetValidFullpathFromArgs(args []string, index int) (string, error) {
 	}
 
 	return fullpath, nil
+}
+
+func GetFilesByExtension(fullpath string, extension string) ([]string, error) {
+	var m4bFiles []string
+
+	err := filepath.WalkDir(fullpath, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return fmt.Errorf("failed to access %s: %w", path, err)
+		}
+
+		if filepath.Ext(path) == extension {
+			m4bFiles = append(m4bFiles, path)
+		}
+		return nil
+	})
+
+	return m4bFiles, err
 }

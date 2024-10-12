@@ -31,4 +31,7 @@ var showCmd = &cobra.Command{
 
 func init() {
 	metadataCmd.AddCommand(showCmd)
+
+	// showCmd.Flags().StringSliceVarP(&tags, "tag", "t", []string{}, "Specify metadata tags to edit")
+
 }

@@ -2,23 +2,23 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 	"regexp"
 
 	"github.com/achwo/narr/utils"
 	"github.com/spf13/cobra"
 )
 
-var dryRun bool
-var tags []string
-var format string
-var verbose bool
-
 var editCmd = &cobra.Command{
 	Use:     "edit",
 	Short:   "The metadata tags for given audio file",
 	Example: "narr metadata edit [file]",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		dryRun, _ := cmd.Flags().GetBool("dry-run")
+		verbose, _ := cmd.Flags().GetBool("verbose")
+		regexStr, _ := cmd.Flags().GetString("regex")
+		tags, _ := cmd.Flags().GetStringSlice("tag")
+		format, _ := cmd.Flags().GetString("format")
+
 		path, err := utils.GetValidFilePathFromArgs(args, 0)
 		if err != nil {
 			return fmt.Errorf("could not resolve path %s: %w", args[0], err)
@@ -27,6 +27,11 @@ var editCmd = &cobra.Command{
 		metadata, err := utils.ReadMetadata(path)
 		if err != nil {
 			return fmt.Errorf("failed to read metadata of %s: %w", path, err)
+		}
+
+		regex, err := regexp.Compile(regexStr)
+		if err != nil {
+			return fmt.Errorf("error compiling regex: %v", err)
 		}
 
 		updatedMetadata, diffs := utils.UpdateMetadataTags(metadata, tags, regex, format)
@@ -62,23 +67,12 @@ var editCmd = &cobra.Command{
 func init() {
 	metadataCmd.AddCommand(editCmd)
 
-	editCmd.Flags().BoolVar(&dryRun, "dry-run", false, "Skip applying the changes")
-	editCmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "More output")
-	editCmd.Flags().StringVar(&regexStr, "regex", "", "Regular expression to apply to album titles")
+	editCmd.Flags().Bool("dry-run", false, "Skip applying the changes")
+	editCmd.Flags().BoolP("verbose", "v", false, "More output")
+	editCmd.Flags().String("regex", "", "Regular expression to apply to album titles")
 	editCmd.MarkFlagRequired("regex")
-	editCmd.Flags().StringSliceVarP(&tags, "tag", "t", []string{}, "Specify metadata tags to edit")
+	editCmd.Flags().StringSliceP("tag", "t", []string{}, "Specify metadata tags to edit")
 	editCmd.MarkFlagRequired("tag")
-	editCmd.Flags().StringVar(&format, "format", "", "format to be used with placeholders for the capture groups from the regex")
+	editCmd.Flags().String("format", "", "Format to be used with placeholders for the capture groups from the regex")
 	editCmd.MarkFlagRequired("format")
-
-	cobra.OnInitialize(func() {
-		if regexStr != "" {
-			var err error
-			regex, err = regexp.Compile(regexStr)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "Error compiling regex: %v\n", err)
-				os.Exit(1)
-			}
-		}
-	})
 }
