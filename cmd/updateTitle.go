@@ -3,8 +3,8 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"github.com/achwo/narr/utils"
 	"io/fs"
-	"narr/utils"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -85,7 +85,7 @@ func updateTitle(fullpath string) error {
 		if err != nil {
 			continue
 		}
-		metadata = utils.UpdateMetadataAlbum(metadata, regex)
+		metadata = utils.UpdateMetadataTags(metadata, []string{"album", "title"}, regex, "Folge %s: %s")
 		outputFile := file + ".tmp.m4b"
 
 		if err := utils.WriteMetadata(file, outputFile, metadata); err != nil {

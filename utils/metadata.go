@@ -1,81 +1,62 @@
 package utils
 
 import (
-	"bytes"
 	"fmt"
-	"os/exec"
 	"regexp"
 	"strings"
 )
 
-func GetMetadataField(metadata string, field string) (string, error) {
+func GetMetadataTagValue(metadata string, tag string) (string, error) {
+	fullTag := tag + "="
 	lines := strings.Split(metadata, "\n")
 	for _, line := range lines {
-		if strings.HasPrefix(line, field) {
-			return line, nil
+		if strings.HasPrefix(line, fullTag) {
+			return strings.TrimPrefix(line, fullTag), nil
 		}
 	}
-	return "", fmt.Errorf("metadata do not contain field %s", field)
+	return "", fmt.Errorf("metadata do not contain field %s", tag)
 }
 
-func ReadMetadata(path string) (string, error) {
-	extractCmd := exec.Command("ffmpeg", "-i", path, "-f", "ffmetadata", "-")
+// UpdateMetadataTags updates the metadata fields provided in the tags slice,
+// replacing their values based on the provided regular expression and format.
+//
+// The function looks for the current value of each tag in the metadata. If the
+// current value matches the provided regular expression, it constructs a new
+// value using the format string and the capture groups from the regex.
+//
+// Parameters:
+//   - metadata: The full metadata string where fields are located.
+//   - tags: A list of tags on which the substitution is applied.
+//   - regex: A regex with capture groups
+//   - format: A format string for constructing the new tag value, with placeholders
+//     for the capture groups from the regex. (in go syntax)
+//
+// Returns: The updated metadata.
+func UpdateMetadataTags(
+	metadata string,
+	tags []string,
+	regex *regexp.Regexp,
+	format string,
+) string {
+	for _, tag := range tags {
+		currentValue, err := GetMetadataTagValue(metadata, tag)
+		if err != nil {
+			fmt.Println(err)
+			continue
+		}
+		if regex.MatchString(currentValue) {
+			matches := regex.FindStringSubmatch(currentValue)
 
-	var metadata bytes.Buffer
-	extractCmd.Stdout = &metadata
+			if len(matches) == 3 {
+				episode := matches[1]
+				title := matches[2]
+				newValue := fmt.Sprintf(format, episode, title)
 
-	if err := extractCmd.Run(); err != nil {
-		return "", fmt.Errorf("failed to extract metadata for file %s: %w", path, err)
-	}
+				fullTag := tag + "="
 
-	fmt.Println("Extracted metadata:")
-	fmt.Println(metadata.String())
-
-	return metadata.String(), nil
-}
-
-func UpdateMetadataAlbum(metadata string, regex *regexp.Regexp) string {
-	if !strings.Contains(metadata, "album=") {
-		fmt.Println("Warning: No album tag found.")
-		return metadata
-	}
-	lines := strings.Split(metadata, "\n")
-
-	tags := []string{"album", "title"}
-
-	for i, line := range lines {
-		for _, tag := range tags {
-			fullTag := tag + "="
-			if strings.HasPrefix(line, fullTag) {
-				currentValue := strings.TrimPrefix(line, fullTag)
-
-				if regex.MatchString(currentValue) {
-					matches := regex.FindStringSubmatch(currentValue)
-
-					if len(matches) == 3 {
-						episode := matches[1]
-						title := matches[2]
-						currentValue = fmt.Sprintf("Folge %s: %s", episode, title)
-					}
-				}
-
-				lines[i] = fullTag + currentValue
-				break
+				metadata = strings.ReplaceAll(metadata, fullTag+currentValue, fullTag+newValue)
 			}
 		}
 	}
-	newMetadata := strings.Join(lines, "\n")
-
-	fmt.Println("Modified metadata:")
-	fmt.Println(newMetadata)
-
-	return newMetadata
-}
-
-func WriteMetadata(inputFile string, outputFile string, metadata string) error {
-	writeCmd := exec.Command("ffmpeg", "-i", inputFile, "-f", "ffmetadata", "-i", "-", "-map_metadata", "1", "-c", "copy", outputFile)
-
-	writeCmd.Stdin = bytes.NewReader([]byte(metadata))
-
-	return writeCmd.Run()
+	return metadata
 }

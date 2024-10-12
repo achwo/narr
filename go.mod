@@ -1,4 +1,4 @@
-module narr
+module github.com/achwo/narr
 
 go 1.23.2
 
