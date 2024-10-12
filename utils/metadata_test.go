@@ -1,6 +1,8 @@
 package utils
 
 import (
+	"fmt"
+	"reflect"
 	"regexp"
 	"testing"
 )
@@ -15,7 +17,6 @@ album_artist=Something With ???
 album=102/Doppelte Bäumung
 date=2002-03-11
 disc=1
-copyright=℗ 2002 Sony Music Entertainment GmbH
 track=1
 encoder=Lavf61.7.100`
 
@@ -23,51 +24,51 @@ func TestGetMetadataField(t *testing.T) {
 	tests := []struct {
 		name     string
 		metadata string
-		field    string
-		expected string
+		tags     []string
+		expected []TagWithValue
 		wantErr  bool
 	}{
 		{
 			name:     "field exists",
 			metadata: fullMetadata,
-			field:    "title",
-			expected: "102/Doppelte Bäumung",
-			wantErr:  false,
+			tags:     []string{"title", "album"},
+			expected: []TagWithValue{
+				{Tag: "title", Value: "102/Doppelte Bäumung"},
+				{Tag: "album", Value: "102/Doppelte Bäumung"},
+				{Tag: "date", Value: "2002-03-11"},
+			},
 		},
 		{
 			name:     "field with no content",
 			metadata: "album=",
-			field:    "album",
-			expected: "",
-			wantErr:  false,
+			tags:     []string{"album"},
+			expected: []TagWithValue{{Tag: "album", Value: ""}},
 		},
 		{
 			name:     "field does not exist",
 			metadata: "album=Some Title",
-			field:    "title",
-			wantErr:  true,
+			tags:     []string{"title"},
+			expected: nil,
 		},
 		{
 			name:     "empty metadata",
 			metadata: "",
-			field:    "title",
-			wantErr:  true,
+			tags:     []string{"title"},
+			expected: nil,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := GetMetadataTagValue(tt.metadata, tt.field)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("GetMetadataField() error = %v, wantErr %v", err, tt.wantErr)
-				return
+			got := GetMetadataTagValues(tt.metadata, tt.tags)
+			if got == nil {
+				fmt.Println("foll null")
 			}
-			if got != tt.expected {
+			if !reflect.DeepEqual(got, tt.expected) {
 				t.Errorf("GetMetadataField() = %v, expected %v", got, tt.expected)
 			}
 		})
 	}
-
 }
 
 func TestUpdateMetadataTags(t *testing.T) {

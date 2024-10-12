@@ -6,15 +6,39 @@ import (
 	"strings"
 )
 
-func GetMetadataTagValue(metadata string, tag string) (string, error) {
-	fullTag := tag + "="
+type TagWithValue struct {
+	Tag   string
+	Value string
+}
+
+func (t TagWithValue) Prefix() string {
+	return fmt.Sprintf("%s=", t.Tag)
+}
+
+func (t TagWithValue) String() string {
+	return fmt.Sprintf("%s=%s", t.Tag, t.Value)
+}
+
+func GetMetadataTagValues(metadata string, tags []string) []TagWithValue {
+	var tagValues []TagWithValue
+
 	lines := strings.Split(metadata, "\n")
 	for _, line := range lines {
-		if strings.HasPrefix(line, fullTag) {
-			return strings.TrimPrefix(line, fullTag), nil
+		for _, tag := range tags {
+			fullTag := tag + "="
+			if strings.HasPrefix(line, fullTag) {
+
+				withValue := TagWithValue{
+					Tag:   tag,
+					Value: strings.TrimPrefix(line, fullTag),
+				}
+
+				tagValues = append(tagValues, withValue)
+			}
 		}
 	}
-	return "", fmt.Errorf("metadata do not contain field %s", tag)
+
+	return tagValues
 }
 
 // UpdateMetadataTags updates the metadata fields provided in the tags slice,
@@ -39,27 +63,26 @@ func UpdateMetadataTags(
 	format string,
 ) (string, []Diff) {
 	var affectedLines []Diff
-	for _, tag := range tags {
-		currentValue, err := GetMetadataTagValue(metadata, tag)
-		if err != nil {
-			fmt.Println(err)
-			continue
-		}
-		if regex.MatchString(currentValue) {
-			matches := regex.FindStringSubmatch(currentValue)
+	tagsWithValue := GetMetadataTagValues(metadata, tags)
+
+	for _, currentValue := range tagsWithValue {
+		if regex.MatchString(currentValue.Value) {
+			matches := regex.FindStringSubmatch(currentValue.Value)
 
 			if len(matches) == 3 {
 				episode := matches[1]
 				title := matches[2]
 				newValue := fmt.Sprintf(format, episode, title)
 
-				fullTag := tag + "="
-
-				metadata = strings.ReplaceAll(metadata, fullTag+currentValue, fullTag+newValue)
+				metadata = strings.ReplaceAll(
+					metadata,
+					currentValue.String(),
+					currentValue.Prefix()+newValue,
+				)
 
 				affectedLines = append(affectedLines, Diff{
-					Tag:    tag,
-					Before: currentValue,
+					Tag:    currentValue.Tag,
+					Before: currentValue.Value,
 					After:  newValue,
 				})
 			}
