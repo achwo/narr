@@ -138,7 +138,7 @@ album=Other Bäumung`,
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := UpdateMetadataTags(tt.metadata, tt.tags, tt.regex, tt.format)
+			got, _ := UpdateMetadataTags(tt.metadata, tt.tags, tt.regex, tt.format)
 			if got != tt.expected {
 				t.Errorf("GetMetadataField() = %v, expected %v", got, tt.expected)
 			}

@@ -29,11 +29,15 @@ var editCmd = &cobra.Command{
 			return fmt.Errorf("failed to read metadata of %s: %w", path, err)
 		}
 
-		updatedMetadata := utils.UpdateMetadataTags(metadata, tags, regex, format)
+		updatedMetadata, diffs := utils.UpdateMetadataTags(metadata, tags, regex, format)
 
-		if dryRun || verbose {
+		if verbose {
 			fmt.Println("Metadata after update:")
 			fmt.Println(updatedMetadata)
+		}
+
+		for _, diff := range diffs {
+			fmt.Println(diff.Tag, ":", diff.Before, "->", diff.After)
 		}
 
 		if dryRun {

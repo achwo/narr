@@ -31,13 +31,14 @@ func GetMetadataTagValue(metadata string, tag string) (string, error) {
 //   - format: A format string for constructing the new tag value, with placeholders
 //     for the capture groups from the regex. (in go syntax)
 //
-// Returns: The updated metadata.
+// Returns: The updated metadata and diffs for each change.
 func UpdateMetadataTags(
 	metadata string,
 	tags []string,
 	regex *regexp.Regexp,
 	format string,
-) string {
+) (string, []Diff) {
+	var affectedLines []Diff
 	for _, tag := range tags {
 		currentValue, err := GetMetadataTagValue(metadata, tag)
 		if err != nil {
@@ -55,8 +56,20 @@ func UpdateMetadataTags(
 				fullTag := tag + "="
 
 				metadata = strings.ReplaceAll(metadata, fullTag+currentValue, fullTag+newValue)
+
+				affectedLines = append(affectedLines, Diff{
+					Tag:    tag,
+					Before: currentValue,
+					After:  newValue,
+				})
 			}
 		}
 	}
-	return metadata
+	return metadata, affectedLines
+}
+
+type Diff struct {
+	Tag    string
+	Before string
+	After  string
 }

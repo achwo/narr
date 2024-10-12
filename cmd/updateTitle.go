@@ -70,7 +70,7 @@ func updateTitle(fullpath string) error {
 		if err != nil {
 			continue
 		}
-		metadata = utils.UpdateMetadataTags(metadata, []string{"album", "title"}, regex, "Folge %s: %s")
+		metadata, _ = utils.UpdateMetadataTags(metadata, []string{"album", "title"}, regex, "Folge %s: %s")
 		outputFile := file + ".tmp.m4b"
 
 		if err := utils.WriteMetadataO(file, outputFile, metadata, false); err != nil {
