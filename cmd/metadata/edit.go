@@ -24,17 +24,17 @@ var editCmd = &cobra.Command{
 			return fmt.Errorf("could not resolve path %s: %w", args[0], err)
 		}
 
+		regex, err := regexp.Compile(regexStr)
+		if err != nil {
+			return fmt.Errorf("error compiling regex: %v", err)
+		}
+
 		files, err := utils.GetFilesByExtension(path, ".m4b")
 
 		for _, file := range files {
 			metadata, err := utils.ReadMetadata(file)
 			if err != nil {
 				return fmt.Errorf("failed to read metadata of %s: %w", file, err)
-			}
-
-			regex, err := regexp.Compile(regexStr)
-			if err != nil {
-				return fmt.Errorf("error compiling regex: %v", err)
 			}
 
 			updatedMetadata, diffs := utils.UpdateMetadataTags(metadata, tags, regex, format)

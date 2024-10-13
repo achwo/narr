@@ -2,6 +2,7 @@ package files
 
 import (
 	"fmt"
+	"path/filepath"
 
 	"github.com/achwo/narr/utils"
 
@@ -13,6 +14,7 @@ var listCmd = &cobra.Command{
 	Short:   "List files within or below given path",
 	Example: "narr file list [path]",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		noPath, _ := cmd.Flags().GetBool("noPath")
 		path, err := utils.GetValidFullpathFromArgs(args, 0)
 		if err != nil {
 			return fmt.Errorf("could not resolve path %s: %w", args[0], err)
@@ -24,7 +26,11 @@ var listCmd = &cobra.Command{
 		}
 
 		for _, file := range files {
-			fmt.Println(file)
+			if noPath {
+				fmt.Println(filepath.Base(file))
+			} else {
+				fmt.Println(file)
+			}
 		}
 
 		return nil
@@ -33,4 +39,6 @@ var listCmd = &cobra.Command{
 
 func init() {
 	FilesCmd.AddCommand(listCmd)
+
+	listCmd.Flags().Bool("noPath", false, "Print only the file name")
 }
