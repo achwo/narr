@@ -1,4 +1,4 @@
-package cmd
+package metadata
 
 import (
 	"fmt"
@@ -79,8 +79,7 @@ var editCmd = &cobra.Command{
 }
 
 func init() {
-	metadataCmd.AddCommand(editCmd)
-
+	MetadataCmd.AddCommand(editCmd)
 	editCmd.Flags().Bool("dryRun", false, "Skip applying the changes")
 	editCmd.Flags().BoolP("verbose", "v", false, "More output")
 	editCmd.Flags().String("regex", "", "Regular expression to apply to album titles")

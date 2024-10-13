@@ -1,4 +1,4 @@
-package cmd
+package metadata
 
 import (
 	"fmt"
@@ -49,6 +49,6 @@ var showCmd = &cobra.Command{
 }
 
 func init() {
-	metadataCmd.AddCommand(showCmd)
+	MetadataCmd.AddCommand(showCmd)
 	showCmd.Flags().StringSliceP("tag", "t", []string{}, "Specify metadata tags to show")
 }
