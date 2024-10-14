@@ -32,7 +32,7 @@ func WriteMetadata(file string, metadata string, verbose bool) error {
 
 	err = os.Rename(tmpFile, file)
 	if err != nil {
-		return fmt.Errorf("could not rename temp file to output file: %v", err)
+		return fmt.Errorf("could not rename temp file to output file: %w", err)
 	}
 
 	return nil

@@ -34,7 +34,7 @@ to quickly create a Cobra application.`,
 
 		regex, err := regexp.Compile(regexStr)
 		if err != nil {
-			return fmt.Errorf("error compiling regex: %v", err)
+			return fmt.Errorf("error compiling regex: %w", err)
 		}
 
 		files, err := utils.GetFilesByExtension(path, ".m4b")
