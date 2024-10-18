@@ -4,12 +4,15 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/achwo/narr/config"
 	"github.com/achwo/narr/utils"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 )
+
+const configFileName = "narr.yaml"
 
 var configCmd = &cobra.Command{
 	Use:   "config",
@@ -30,9 +33,9 @@ var generateCmd = &cobra.Command{
 			AudioFilePath: "",
 			CoverPath:     "",
 			HasChapters:   false,
-			MetadataRules: []config.RegexRule{{}},
-			ChapterRules:  []config.RegexRule{{}},
-			OutputRules:   []config.RegexRule{{}},
+			MetadataRules: []config.MetadataRule{},
+			ChapterRules:  []config.ChapterRule{},
+			OutputRules:   []config.OutputRule{},
 		}
 
 		jsonBytes, err := yaml.Marshal(emptyConfig)
@@ -47,7 +50,41 @@ var generateCmd = &cobra.Command{
 	},
 }
 
+var checkCmd = &cobra.Command{
+	Use:   "check <dir>",
+	Short: "Check config for validity",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		path, err := utils.GetValidFullpathFromArgs(args, 0)
+		if err != nil {
+			return fmt.Errorf("could not resolve path %s: %w", args[0], err)
+		}
+
+		var fullpath string
+		if strings.HasSuffix(path, configFileName) {
+			fullpath = path
+		} else {
+			fullpath = filepath.Join(path, configFileName)
+		}
+
+		bytes, err := os.ReadFile(fullpath)
+		if err != nil {
+			return fmt.Errorf("could not read file %s: %w", fullpath, err)
+		}
+
+		var config config.ProjectConfig
+		err = yaml.Unmarshal(bytes, &config)
+		if err != nil {
+			return fmt.Errorf("could not unmarshal file %s: %w", fullpath, err)
+		}
+
+		fmt.Println(config)
+
+		return nil
+	},
+}
+
 func init() {
 	M4bCmd.AddCommand(configCmd)
 	configCmd.AddCommand(generateCmd)
+	configCmd.AddCommand(checkCmd)
 }
