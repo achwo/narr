@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/achwo/narr/config"
+	"github.com/achwo/narr/m4b"
 	"github.com/achwo/narr/utils"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
@@ -83,8 +84,32 @@ var checkCmd = &cobra.Command{
 	},
 }
 
+var chaptersCmd = &cobra.Command{
+	Use:   "chapters <dir>",
+	Short: "Show chapters with applied rules",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		path, err := utils.GetValidFullpathFromArgs(args, 0)
+		if err != nil {
+			return fmt.Errorf("could not resolve path %s: %w", args[0], err)
+		}
+
+		projectPath, config, err := config.LoadConfig(path)
+		if err != nil {
+			return fmt.Errorf("could not load config %s: %w", path, err)
+		}
+
+		err = m4b.ShowChapters(projectPath, *config)
+		if err != nil {
+			return fmt.Errorf("Could not get chapters: %w", err)
+		}
+
+		return nil
+	},
+}
+
 func init() {
 	M4bCmd.AddCommand(configCmd)
 	configCmd.AddCommand(generateCmd)
 	configCmd.AddCommand(checkCmd)
+	checkCmd.AddCommand(chaptersCmd)
 }

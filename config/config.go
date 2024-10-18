@@ -3,6 +3,13 @@ package config
 import (
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
+	"regexp"
+	"strings"
+
+	"github.com/achwo/narr/utils"
+	"gopkg.in/yaml.v3"
 )
 
 type ProjectConfig struct {
@@ -25,6 +32,22 @@ type MetadataRule struct {
 type ChapterRule struct {
 	Regex  string `yaml:"regex"`
 	Format string `yaml:"format"`
+}
+
+func (r *ChapterRule) Validate() error {
+	if r.Regex == "" || r.Format == "" {
+		return errors.New("regex rule requires both regex and format")
+	}
+	return nil
+}
+
+func (r *ChapterRule) Apply(chapter string) (string, error) {
+	regex, err := regexp.Compile(r.Regex)
+	if err != nil {
+		// TODO: might be better in construction (want to know validity in config check also)
+		return "", fmt.Errorf("Chapter rule regex '%s' is invalid: %w", r.Regex, err)
+	}
+	return utils.ApplyRegex(chapter, regex, r.Format)
 }
 
 type OutputRule struct {
@@ -89,13 +112,6 @@ func (r *OutputRule) Validate() error {
 	return nil
 }
 
-func (r *ChapterRule) Validate() error {
-	if r.Regex == "" || r.Format == "" {
-		return errors.New("regex rule requires both regex and format")
-	}
-	return nil
-}
-
 func (c *ProjectConfig) Validate() error {
 	if c.AudioFilePath == "" {
 		return errors.New("audioFilePath must be a valid path")
@@ -123,4 +139,46 @@ func (c *ProjectConfig) Validate() error {
 	}
 
 	return nil
+}
+
+func (c *ProjectConfig) FullAudioFilePath() (string, error) {
+	audioFilePath, err := filepath.Abs(c.AudioFilePath)
+	if err != nil {
+		return "", fmt.Errorf("Could not get absolute path %s, %w", c.AudioFilePath, err)
+	}
+	return audioFilePath, nil
+}
+
+func (c *ProjectConfig) AudioFiles() ([]string, error) {
+	fullpath, err := c.FullAudioFilePath()
+	if err != nil {
+		return nil, err
+	}
+
+	return utils.GetFilesByExtension(fullpath, ".m4a")
+}
+
+const configFileName = "narr.yaml"
+
+func LoadConfig(path string) (string, *ProjectConfig, error) {
+	var fullpath string
+
+	if strings.HasSuffix(path, configFileName) {
+		fullpath = path
+	} else {
+		fullpath = filepath.Join(path, configFileName)
+	}
+
+	bytes, err := os.ReadFile(fullpath)
+	if err != nil {
+		return "", nil, fmt.Errorf("could not read file %s: %w", fullpath, err)
+	}
+
+	var config ProjectConfig
+	err = yaml.Unmarshal(bytes, &config)
+	if err != nil {
+		return "", nil, fmt.Errorf("could not unmarshal file %s: %w", fullpath, err)
+	}
+
+	return filepath.Base(fullpath), &config, nil
 }
