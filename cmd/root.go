@@ -4,6 +4,7 @@ import (
 	"os"
 
 	"github.com/achwo/narr/cmd/files"
+	"github.com/achwo/narr/cmd/m4b"
 	"github.com/achwo/narr/cmd/metadata"
 	"github.com/spf13/cobra"
 )
@@ -27,6 +28,7 @@ func Execute() {
 func init() {
 	rootCmd.AddCommand(metadata.MetadataCmd)
 	rootCmd.AddCommand(files.FilesCmd)
+	rootCmd.AddCommand(m4b.M4bCmd)
 	// Here you will define your flags and configuration settings.
 	// Cobra supports persistent flags, which, if defined here,
 	// will be global for your application.
