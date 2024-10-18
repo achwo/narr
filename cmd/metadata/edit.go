@@ -31,7 +31,7 @@ var editCmd = &cobra.Command{
 
 		files, err := utils.GetFilesByExtension(path, ".m4b")
 
-		var metadataManager utils.MetadataManager = &utils.FFmpegMetadataManager{}
+		var metadataManager utils.MetadataManager = &utils.FFmpegMetadataProvider{}
 
 		for _, file := range files {
 			metadata, err := metadataManager.ReadMetadata(file)

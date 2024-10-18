@@ -8,6 +8,12 @@ import (
 	"path/filepath"
 )
 
+type OSAudioFileProvider struct{}
+
+func (p *OSAudioFileProvider) AudioFiles(fullPath string) ([]string, error) {
+	return GetFilesByExtension(fullPath, ".m4a")
+}
+
 func GetValidFilePathFromArgs(args []string, index int) (string, error) {
 	path, err := GetValidFullpathFromArgs(args, index)
 	if err != nil {

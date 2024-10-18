@@ -17,9 +17,9 @@ type MetadataManager interface {
 	ReadTitleAndDuration(file string) (string, float64, error)
 }
 
-type FFmpegMetadataManager struct{}
+type FFmpegMetadataProvider struct{}
 
-func (m *FFmpegMetadataManager) ReadMetadata(path string) (string, error) {
+func (m *FFmpegMetadataProvider) ReadMetadata(path string) (string, error) {
 	extractCmd := exec.Command("ffmpeg", "-i", path, "-f", "ffmetadata", "-")
 
 	var metadata bytes.Buffer
@@ -33,7 +33,7 @@ func (m *FFmpegMetadataManager) ReadMetadata(path string) (string, error) {
 }
 
 // WriteMetadata updates the metadata in the file
-func (m *FFmpegMetadataManager) WriteMetadata(file string, metadata string, verbose bool) error {
+func (m *FFmpegMetadataProvider) WriteMetadata(file string, metadata string, verbose bool) error {
 	tmpFile := file + ".tmp" + filepath.Ext(file)
 
 	err := m.WriteMetadataO(file, tmpFile, metadata, verbose)
@@ -50,7 +50,7 @@ func (m *FFmpegMetadataManager) WriteMetadata(file string, metadata string, verb
 }
 
 // WriteMetadataO is like WriteMetadata with explicit output file
-func (m *FFmpegMetadataManager) WriteMetadataO(inputFile string, outputFile string, metadata string, verbose bool) error {
+func (m *FFmpegMetadataProvider) WriteMetadataO(inputFile string, outputFile string, metadata string, verbose bool) error {
 	writeCmd := exec.Command("ffmpeg", "-i", inputFile, "-f", "ffmetadata", "-i", "-", "-map_metadata", "1", "-c", "copy", outputFile)
 
 	writeCmd.Stdin = bytes.NewReader([]byte(metadata))
@@ -75,7 +75,7 @@ func (m *FFmpegMetadataManager) WriteMetadataO(inputFile string, outputFile stri
 	return nil
 }
 
-func (m *FFmpegMetadataManager) ReadTitleAndDuration(file string) (string, float64, error) {
+func (m *FFmpegMetadataProvider) ReadTitleAndDuration(file string) (string, float64, error) {
 	dataCmd := exec.Command(
 		"ffprobe",
 		"-v",

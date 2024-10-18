@@ -14,6 +14,9 @@ import (
 
 const configFileName = "narr.yaml"
 
+var metadataProvider m4b.MetadataProvider = &utils.FFmpegMetadataProvider{}
+var audioFileProvider m4b.AudioFileProvider = &utils.OSAudioFileProvider{}
+
 var configCmd = &cobra.Command{
 	Use:   "config",
 	Short: "Manage m4b project config",
@@ -92,7 +95,7 @@ var chaptersCmd = &cobra.Command{
 			return fmt.Errorf("could not resolve path %s: %w", args[0], err)
 		}
 
-		project, err := m4b.NewProjectFromPath(path)
+		project, err := m4b.NewProjectFromPath(path, audioFileProvider, metadataProvider)
 		if err != nil {
 			return err
 		}
@@ -120,7 +123,7 @@ var metadataCmd = &cobra.Command{
 			return fmt.Errorf("could not resolve path %s: %w", args[0], err)
 		}
 
-		project, err := m4b.NewProjectFromPath(path)
+		project, err := m4b.NewProjectFromPath(path, audioFileProvider, metadataProvider)
 		if err != nil {
 			return fmt.Errorf("could not load config %s: %w", path, err)
 		}

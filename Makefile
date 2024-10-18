@@ -15,6 +15,11 @@ fmt:
 vet:
 	go vet ./...
 
+# Run tests
+.PHONY: test
+test:
+	go test ./...
+
 # Build the Go project
 .PHONY: build
 build:

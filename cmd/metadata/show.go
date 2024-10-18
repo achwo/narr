@@ -25,7 +25,7 @@ var showCmd = &cobra.Command{
 			return fmt.Errorf("failed to read files within %s: %w", path, err)
 		}
 
-		metadataManager := utils.FFmpegMetadataManager{}
+		metadataManager := utils.FFmpegMetadataProvider{}
 		for _, file := range files {
 			metadata, err := metadataManager.ReadMetadata(file)
 			if err != nil {

@@ -7,28 +7,85 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/achwo/narr/utils"
 	"gopkg.in/yaml.v3"
 )
 
 const configFileName = "narr.yaml"
 
+type AudioFileProvider interface {
+	AudioFiles(fullPath string) ([]string, error)
+}
+
+type MetadataProvider interface {
+	ReadTitleAndDuration(file string) (string, float64, error)
+	ReadMetadata(file string) (string, error)
+}
+
 type Project interface {
 	AudioFiles() ([]string, error)
 	ShowChapters() (string, error)
+	ShowMetadata() (string, error)
 }
 
 type M4bProject struct {
-	Config ProjectConfig
+	Config           ProjectConfig
+	AudioProvider    AudioFileProvider
+	MetadataProvider MetadataProvider
 }
 
-func (c *M4bProject) AudioFiles() ([]string, error) {
-	fullpath, err := c.Config.FullAudioFilePath()
+func (p *M4bProject) AudioFiles() ([]string, error) {
+	fullpath, err := p.Config.FullAudioFilePath()
 	if err != nil {
 		return nil, err
 	}
 
-	return utils.GetFilesByExtension(fullpath, ".m4a")
+	return p.AudioProvider.AudioFiles(fullpath)
+}
+
+func NewProject(
+	config ProjectConfig,
+	audioProvider AudioFileProvider,
+	metadataProvider MetadataProvider,
+) (*M4bProject, error) {
+	err := config.Validate()
+	if err != nil {
+		return nil, err
+	}
+
+	return &M4bProject{
+		Config:           config,
+		AudioProvider:    audioProvider,
+		MetadataProvider: metadataProvider,
+	}, nil
+}
+
+func NewProjectFromPath(
+	path string,
+	audioProvider AudioFileProvider,
+	metadataProvider MetadataProvider,
+) (*M4bProject, error) {
+	var fullpath string
+
+	if strings.HasSuffix(path, configFileName) {
+		fullpath = path
+	} else {
+		fullpath = filepath.Join(path, configFileName)
+	}
+
+	bytes, err := os.ReadFile(fullpath)
+	if err != nil {
+		return nil, fmt.Errorf("could not read file %s: %w", fullpath, err)
+	}
+
+	var config ProjectConfig
+	err = yaml.Unmarshal(bytes, &config)
+	if err != nil {
+		return nil, fmt.Errorf("could not unmarshal file %s: %w", fullpath, err)
+	}
+
+	config.ProjectPath = filepath.Base(fullpath)
+
+	return NewProject(config, audioProvider, metadataProvider)
 }
 
 func (p *M4bProject) ShowChapters() (string, error) {
@@ -38,13 +95,12 @@ func (p *M4bProject) ShowChapters() (string, error) {
 	}
 
 	chapters := make(map[string]*Chapter)
+	fmt.Println(audioFiles)
 	var chapterOrder []string
 	var previousChapter *Chapter
 
-	var metadataManager utils.MetadataManager = &utils.FFmpegMetadataManager{}
-
 	for i, file := range audioFiles {
-		title, duration, err := metadataManager.ReadTitleAndDuration(file)
+		title, duration, err := p.MetadataProvider.ReadTitleAndDuration(file)
 		if err != nil {
 			return "", fmt.Errorf("Could not read file data for file %s: %w", file, err)
 		}
@@ -57,7 +113,6 @@ func (p *M4bProject) ShowChapters() (string, error) {
 			}
 		}
 
-		value := chapters[chapterName]
 		value, exists := chapters[chapterName]
 
 		newFile := File{Name: file, Duration: duration}
@@ -88,40 +143,6 @@ func (p *M4bProject) ShowChapters() (string, error) {
 	return markersFileContent, nil
 }
 
-func NewProject(config ProjectConfig) (*M4bProject, error) {
-	err := config.Validate()
-	if err != nil {
-		return nil, err
-	}
-
-	return &M4bProject{Config: config}, nil
-}
-
-func NewProjectFromPath(path string) (*M4bProject, error) {
-	var fullpath string
-
-	if strings.HasSuffix(path, configFileName) {
-		fullpath = path
-	} else {
-		fullpath = filepath.Join(path, configFileName)
-	}
-
-	bytes, err := os.ReadFile(fullpath)
-	if err != nil {
-		return nil, fmt.Errorf("could not read file %s: %w", fullpath, err)
-	}
-
-	var config ProjectConfig
-	err = yaml.Unmarshal(bytes, &config)
-	if err != nil {
-		return nil, fmt.Errorf("could not unmarshal file %s: %w", fullpath, err)
-	}
-
-	config.ProjectPath = filepath.Base(fullpath)
-
-	return NewProject(config)
-}
-
 func (p *M4bProject) ShowMetadata() (string, error) {
 	audioFiles, err := p.AudioFiles()
 	if err != nil {
@@ -134,8 +155,7 @@ func (p *M4bProject) ShowMetadata() (string, error) {
 
 	referenceFile := audioFiles[0]
 
-	var metadataManager utils.MetadataManager = &utils.FFmpegMetadataManager{}
-	metadata, err := metadataManager.ReadMetadata(referenceFile)
+	metadata, err := p.MetadataProvider.ReadMetadata(referenceFile)
 	if err != nil {
 		return "", fmt.Errorf("could not read metadata: %w", err)
 	}
