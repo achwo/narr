@@ -1,15 +1,13 @@
 package m4b
 
 import (
-	"bytes"
+	"errors"
 	"fmt"
-	"os/exec"
-	"regexp"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/achwo/narr/config"
+	"github.com/achwo/narr/utils"
 )
 
 type Chapter struct {
@@ -69,27 +67,29 @@ type File struct {
 	Duration float64
 }
 
-func ShowChapters(projectPath string, conf config.ProjectConfig) error {
+func ShowChapters(conf config.ProjectConfig) (string, error) {
 	audioFiles, err := conf.AudioFiles()
 	if err != nil {
-		return err
+		return "", fmt.Errorf("Could not load audio files: %w", err)
 	}
 
 	chapters := make(map[string]*Chapter)
 	var chapterOrder []string
 	var previousChapter *Chapter
 
+	var metadataManager utils.MetadataManager = &utils.FFmpegMetadataManager{}
+
 	for i, file := range audioFiles {
-		title, duration, err := readTitleAndDuration(file)
+		title, duration, err := metadataManager.ReadTitleAndDuration(file)
 		if err != nil {
-			return fmt.Errorf("Could not read file data for file %s: %w", file, err)
+			return "", fmt.Errorf("Could not read file data for file %s: %w", file, err)
 		}
 		chapterName := title
 
 		for _, rule := range conf.ChapterRules {
 			chapterName, err = rule.Apply(chapterName)
 			if err != nil {
-				return fmt.Errorf("Chapter rule invalid: %w", err)
+				return "", fmt.Errorf("Chapter rule invalid: %w", err)
 			}
 		}
 
@@ -121,57 +121,26 @@ func ShowChapters(projectPath string, conf config.ProjectConfig) error {
 
 	markersFileContent := strings.Join(markers, "\n\n")
 
-	fmt.Println(markersFileContent)
-
-	// outputFilePath := filepath.Join(projectPath, "chapters.txt")
-
-	// err = os.WriteFile(outputFilePath, []byte(markersFileContent), 0664)
-	// if err != nil {
-	// 	return fmt.Errorf("Could not write chapters file: %w", err)
-	// }
-	return nil
+	return markersFileContent, nil
 }
 
-func readTitleAndDuration(file string) (string, float64, error) {
-	dataCmd := exec.Command(
-		"ffprobe",
-		"-v",
-		"error",
-		"-select_streams",
-		"a:0",
-		"-show_entries",
-		"format=duration:format_tags=title",
-		file,
-	)
-
-	var data bytes.Buffer
-	dataCmd.Stdout = &data
-
-	if err := dataCmd.Run(); err != nil {
-		return "", 0, fmt.Errorf("failed to extract metadata for file %s: %w", file, err)
-	}
-
-	probeContent := data.String()
-
-	durationRegex := regexp.MustCompile(`duration=([0-9]+\.[0-9]+)`)
-	titleRegex := regexp.MustCompile(`TAG:title=(.+)`)
-
-	titleMatch := titleRegex.FindStringSubmatch(probeContent)
-	if len(titleMatch) < 2 {
-		return "", 0, fmt.Errorf("title not found")
-	}
-
-	title := titleMatch[1]
-
-	durationMatch := durationRegex.FindStringSubmatch(probeContent)
-	if len(durationMatch) < 2 {
-		return "", 0, fmt.Errorf("duration not found")
-	}
-
-	duration, err := strconv.ParseFloat(durationMatch[1], 64)
+func ShowMetadata(conf *config.ProjectConfig) (string, error) {
+	audioFiles, err := conf.AudioFiles()
 	if err != nil {
-		return "", 0, fmt.Errorf("invalid duration value")
+		return "", fmt.Errorf("could not load audio files: %w", err)
 	}
 
-	return title, duration, nil
+	if len(audioFiles) == 0 {
+		return "", errors.New("no audio files found")
+	}
+
+	referenceFile := audioFiles[0]
+
+	var metadataManager utils.MetadataManager = &utils.FFmpegMetadataManager{}
+	metadata, err := metadataManager.ReadMetadata(referenceFile)
+	if err != nil {
+		return "", fmt.Errorf("could not read metadata: %w", err)
+	}
+
+	return metadata, nil
 }

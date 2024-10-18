@@ -35,13 +35,13 @@ Ein Hörbuch von CD zu m4b machen
 
 
 ## Entwurf 
-narr m4b config <dir> => generates a prepared config file
-narr m4b check chapters <config> => prints chapters with rules applied
-narr m4b check metadata <config> => prints metadata with rules applied
-narr m4b check filename <config> => prints filename with rules applied
-narr m4b check --no-rules [thing] <config> => prints metadata without rules applied
-narr m4b run <config> => make an m4b with all steps
-narr m4b run --no-cache <config> => make an m4b with all steps, ignoring previously executed steps
+- [x] narr m4b config <dir> => generates a prepared config file
+- [x] narr m4b check chapters <config> => prints chapters with rules applied
+- [ ] narr m4b check metadata <config> => prints metadata with rules applied
+- [ ] narr m4b check filename <config> => prints filename with rules applied
+- [ ] narr m4b check --no-rules [thing] <config> => prints metadata without rules applied
+- [ ] narr m4b run <config> => make an m4b with all steps
+- [ ] narr m4b run --no-cache <config> => make an m4b with all steps, ignoring previously executed steps
 
 ## Config
 

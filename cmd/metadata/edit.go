@@ -31,8 +31,10 @@ var editCmd = &cobra.Command{
 
 		files, err := utils.GetFilesByExtension(path, ".m4b")
 
+		var metadataManager utils.MetadataManager = &utils.FFmpegMetadataManager{}
+
 		for _, file := range files {
-			metadata, err := utils.ReadMetadata(file)
+			metadata, err := metadataManager.ReadMetadata(file)
 			if err != nil {
 				return fmt.Errorf("failed to read metadata of %s: %w", file, err)
 			}
@@ -66,7 +68,7 @@ var editCmd = &cobra.Command{
 				fmt.Println("Changing metadata in file", file)
 			}
 
-			if err = utils.WriteMetadata(file, updatedMetadata, verbose); err != nil {
+			if err = metadataManager.WriteMetadata(file, updatedMetadata, verbose); err != nil {
 				return fmt.Errorf("could not write metadata: %w", err)
 			}
 

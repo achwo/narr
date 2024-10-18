@@ -44,5 +44,4 @@ func TestApplyRegex(t *testing.T) {
 			}
 		})
 	}
-
 }

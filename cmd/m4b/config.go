@@ -93,15 +93,45 @@ var chaptersCmd = &cobra.Command{
 			return fmt.Errorf("could not resolve path %s: %w", args[0], err)
 		}
 
-		projectPath, config, err := config.LoadConfig(path)
+		_, config, err := config.LoadConfig(path)
 		if err != nil {
 			return fmt.Errorf("could not load config %s: %w", path, err)
 		}
 
-		err = m4b.ShowChapters(projectPath, *config)
+		chaptersContent, err := m4b.ShowChapters(*config)
 		if err != nil {
 			return fmt.Errorf("Could not get chapters: %w", err)
 		}
+
+		fmt.Println(chaptersContent)
+
+		return nil
+	},
+}
+
+var metadataCmd = &cobra.Command{
+	Use:   "metadata <dir>",
+	Short: "Show metadata with applied rules",
+	Long: `Show metadata with applied rules
+	
+	Uses the first file for metadata.`,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		path, err := utils.GetValidFullpathFromArgs(args, 0)
+		if err != nil {
+			return fmt.Errorf("could not resolve path %s: %w", args[0], err)
+		}
+
+		_, config, err := config.LoadConfig(path)
+		if err != nil {
+			return fmt.Errorf("could not load config %s: %w", path, err)
+		}
+
+		metadata, err := m4b.ShowMetadata(config)
+		if err != nil {
+			return fmt.Errorf("Could not get metadata: %w", err)
+		}
+
+		fmt.Println(metadata)
 
 		return nil
 	},
@@ -112,4 +142,5 @@ func init() {
 	configCmd.AddCommand(generateCmd)
 	configCmd.AddCommand(checkCmd)
 	checkCmd.AddCommand(chaptersCmd)
+	checkCmd.AddCommand(metadataCmd)
 }
