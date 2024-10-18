@@ -1,24 +1,11 @@
 package utils
 
 import (
-	"fmt"
 	"regexp"
 	"strings"
 )
 
-type TagWithValue struct {
-	Tag   string
-	Value string
-}
-
-func (t TagWithValue) Prefix() string {
-	return fmt.Sprintf("%s=", t.Tag)
-}
-
-func (t TagWithValue) String() string {
-	return fmt.Sprintf("%s=%s", t.Tag, t.Value)
-}
-
+// Deprecated: Use Project#GetMetadataTags instead
 func GetMetadataTagValues(metadata string, tags []string) []TagWithValue {
 	var tagValues []TagWithValue
 

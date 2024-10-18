@@ -16,6 +16,31 @@ type MetadataRule struct {
 	Format string `yaml:"format,omitempty"`
 }
 
+func (r *MetadataRule) Apply(tags map[string]string) error {
+	value, exists := tags[r.Tag]
+
+	if !exists {
+		return fmt.Errorf("Tag %s does not exist", r.Tag)
+	}
+
+	// TODO: implement delete, set
+
+	switch r.Type {
+	case "regex":
+		regex, err := regexp.Compile(r.Regex)
+		if err != nil {
+			// TODO: might be better in construction (want to know validity in config check also)
+			return fmt.Errorf("Metadata rule regex '%s' is invalid: %w", r.Regex, err)
+		}
+		newValue, err := utils.ApplyRegex(value, regex, r.Format)
+		tags[r.Tag] = newValue
+	default:
+		return errors.ErrUnsupported
+	}
+
+	return nil
+}
+
 func (r *MetadataRule) Validate() error {
 	if r.Tag == "" {
 		return errors.New("rule must have a tag")

@@ -23,7 +23,14 @@ func TestShowChapters(t *testing.T) {
 }
 
 func TestShowMetadata(t *testing.T) {
+	metadataRule := m4b.MetadataRule{
+		Type:   "regex",
+		Tag:    "title",
+		Regex:  "^Chapter (\\d+)-\\d+: (.+)$",
+		Format: "%s - %s",
+	}
 	project, err := setupProject()
+	project.Config.MetadataRules = append(project.Config.MetadataRules, metadataRule)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -36,7 +43,7 @@ func TestShowMetadata(t *testing.T) {
 	assert.Equal(
 		t,
 		`;FFMETADATA1
-title=Chapter 02-02: Star dust
+title=02 - Star dust
 artist=Hans Wurst read by George Washington
 album=The Book
 track=1/16
@@ -46,7 +53,7 @@ date=2002-09-16`,
 	)
 }
 
-func setupProject() (m4b.Project, error) {
+func setupProject() (*m4b.M4bProject, error) {
 	fakeAudioProvider := &testutils.FakeAudioFileProvider{
 		Files: []string{"file1.m4a", "file2.m4a"},
 	}

@@ -156,9 +156,51 @@ func (p *M4bProject) ShowMetadata() (string, error) {
 	referenceFile := audioFiles[0]
 
 	metadata, err := p.MetadataProvider.ReadMetadata(referenceFile)
+
+	tagOrder, tags := p.getMetadataTags(metadata)
+
+	for _, rule := range p.Config.MetadataRules {
+		err = rule.Apply(tags)
+		if err != nil {
+			return "", err
+		}
+	}
+
 	if err != nil {
 		return "", fmt.Errorf("could not read metadata: %w", err)
 	}
 
-	return metadata, nil
+	firstLine := ";FFMETADATA1"
+
+	lines := []string{firstLine}
+
+	for _, tag := range tagOrder {
+		lines = append(lines, tag+"="+tags[tag])
+	}
+
+	return strings.Join(lines, "\n"), nil
+}
+
+func (m *M4bProject) getMetadataTags(metadata string) ([]string, map[string]string) {
+	var tags = make(map[string]string)
+
+	lines := strings.Split(metadata, "\n")[1:]
+	tagOrder := make([]string, 0, len(lines))
+	for _, line := range lines {
+		split := strings.SplitN(line, "=", 2)
+		if len(split) < 1 {
+			continue
+		}
+
+		tagOrder = append(tagOrder, split[0])
+
+		if len(split) == 1 {
+			tags[split[0]] = ""
+			continue
+		}
+
+		tags[split[0]] = split[1]
+	}
+
+	return tagOrder, tags
 }

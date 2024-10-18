@@ -10,11 +10,17 @@ import (
 	"strconv"
 )
 
-type MetadataManager interface {
-	ReadMetadata(filename string) (string, error)
-	WriteMetadata(file string, metadata string, verbose bool) error
-	WriteMetadataO(inputFile string, outputFile string, metadata string, verbose bool) error
-	ReadTitleAndDuration(file string) (string, float64, error)
+type TagWithValue struct {
+	Tag   string
+	Value string
+}
+
+func (t TagWithValue) Prefix() string {
+	return fmt.Sprintf("%s=", t.Tag)
+}
+
+func (t TagWithValue) String() string {
+	return fmt.Sprintf("%s=%s", t.Tag, t.Value)
 }
 
 type FFmpegMetadataProvider struct{}
