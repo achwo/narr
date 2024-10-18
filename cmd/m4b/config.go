@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/achwo/narr/config"
 	"github.com/achwo/narr/m4b"
 	"github.com/achwo/narr/utils"
 	"github.com/spf13/cobra"
@@ -30,13 +29,13 @@ var generateCmd = &cobra.Command{
 			return fmt.Errorf("could not resolve path %s: %w", args[0], err)
 		}
 
-		emptyConfig := config.ProjectConfig{
+		emptyConfig := m4b.ProjectConfig{
 			AudioFilePath: "",
 			CoverPath:     "",
 			HasChapters:   false,
-			MetadataRules: []config.MetadataRule{},
-			ChapterRules:  []config.ChapterRule{},
-			OutputRules:   []config.OutputRule{},
+			MetadataRules: []m4b.MetadataRule{},
+			ChapterRules:  []m4b.ChapterRule{},
+			OutputRules:   []m4b.OutputRule{},
 		}
 
 		jsonBytes, err := yaml.Marshal(emptyConfig)
@@ -72,7 +71,7 @@ var checkCmd = &cobra.Command{
 			return fmt.Errorf("could not read file %s: %w", fullpath, err)
 		}
 
-		var config config.ProjectConfig
+		var config m4b.ProjectConfig
 		err = yaml.Unmarshal(bytes, &config)
 		if err != nil {
 			return fmt.Errorf("could not unmarshal file %s: %w", fullpath, err)
@@ -93,12 +92,12 @@ var chaptersCmd = &cobra.Command{
 			return fmt.Errorf("could not resolve path %s: %w", args[0], err)
 		}
 
-		_, config, err := config.LoadConfig(path)
+		project, err := m4b.NewProjectFromPath(path)
 		if err != nil {
-			return fmt.Errorf("could not load config %s: %w", path, err)
+			return err
 		}
 
-		chaptersContent, err := m4b.ShowChapters(*config)
+		chaptersContent, err := project.ShowChapters()
 		if err != nil {
 			return fmt.Errorf("Could not get chapters: %w", err)
 		}
@@ -121,12 +120,12 @@ var metadataCmd = &cobra.Command{
 			return fmt.Errorf("could not resolve path %s: %w", args[0], err)
 		}
 
-		_, config, err := config.LoadConfig(path)
+		project, err := m4b.NewProjectFromPath(path)
 		if err != nil {
 			return fmt.Errorf("could not load config %s: %w", path, err)
 		}
 
-		metadata, err := m4b.ShowMetadata(config)
+		metadata, err := project.ShowMetadata()
 		if err != nil {
 			return fmt.Errorf("Could not get metadata: %w", err)
 		}

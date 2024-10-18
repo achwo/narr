@@ -3,72 +3,36 @@ package m4b
 import (
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
-	"time"
 
-	"github.com/achwo/narr/config"
 	"github.com/achwo/narr/utils"
+	"gopkg.in/yaml.v3"
 )
 
-type Chapter struct {
-	title           string
-	previousChapter *Chapter
-	files           []File
-	index           int
+const configFileName = "narr.yaml"
+
+type Project interface {
+	AudioFiles() ([]string, error)
+	ShowChapters() (string, error)
 }
 
-func (c *Chapter) addFile(file File) {
-	c.files = append(c.files, file)
+type M4bProject struct {
+	Config ProjectConfig
 }
 
-func (c *Chapter) ChapterMarker() string {
-	formatTime := func(s float64) string {
-		duration := time.Duration(s * float64(time.Second))
-
-		hours := int(duration.Hours())
-		minutes := int(duration.Minutes()) % 60
-		seconds := int(duration.Seconds()) % 60
-		milliseconds := int(duration.Milliseconds()) % 1000
-		return fmt.Sprintf("%02d:%02d:%02d.%03d", hours, minutes, seconds, milliseconds)
+func (c *M4bProject) AudioFiles() ([]string, error) {
+	fullpath, err := c.Config.FullAudioFilePath()
+	if err != nil {
+		return nil, err
 	}
 
-	offsetFormatted := formatTime(c.offset())
-	chapterIndex := fmt.Sprintf("%02d", c.index)
-
-	return fmt.Sprintf(
-		"CHAPTER%s=%s\nCHAPTER%sNAME=%s",
-		chapterIndex,
-		offsetFormatted,
-		chapterIndex,
-		c.title,
-	)
+	return utils.GetFilesByExtension(fullpath, ".m4a")
 }
 
-func (c *Chapter) duration() float64 {
-	duration := 0.0
-
-	for _, file := range c.files {
-		duration += file.Duration
-	}
-
-	return duration
-}
-
-// Offset from the start in seconds
-func (c *Chapter) offset() float64 {
-	if c.previousChapter == nil {
-		return 0
-	}
-	return c.previousChapter.offset() + c.previousChapter.duration()
-}
-
-type File struct {
-	Name     string
-	Duration float64
-}
-
-func ShowChapters(conf config.ProjectConfig) (string, error) {
-	audioFiles, err := conf.AudioFiles()
+func (p *M4bProject) ShowChapters() (string, error) {
+	audioFiles, err := p.AudioFiles()
 	if err != nil {
 		return "", fmt.Errorf("Could not load audio files: %w", err)
 	}
@@ -86,7 +50,7 @@ func ShowChapters(conf config.ProjectConfig) (string, error) {
 		}
 		chapterName := title
 
-		for _, rule := range conf.ChapterRules {
+		for _, rule := range p.Config.ChapterRules {
 			chapterName, err = rule.Apply(chapterName)
 			if err != nil {
 				return "", fmt.Errorf("Chapter rule invalid: %w", err)
@@ -124,8 +88,42 @@ func ShowChapters(conf config.ProjectConfig) (string, error) {
 	return markersFileContent, nil
 }
 
-func ShowMetadata(conf *config.ProjectConfig) (string, error) {
-	audioFiles, err := conf.AudioFiles()
+func NewProject(config ProjectConfig) (*M4bProject, error) {
+	err := config.Validate()
+	if err != nil {
+		return nil, err
+	}
+
+	return &M4bProject{Config: config}, nil
+}
+
+func NewProjectFromPath(path string) (*M4bProject, error) {
+	var fullpath string
+
+	if strings.HasSuffix(path, configFileName) {
+		fullpath = path
+	} else {
+		fullpath = filepath.Join(path, configFileName)
+	}
+
+	bytes, err := os.ReadFile(fullpath)
+	if err != nil {
+		return nil, fmt.Errorf("could not read file %s: %w", fullpath, err)
+	}
+
+	var config ProjectConfig
+	err = yaml.Unmarshal(bytes, &config)
+	if err != nil {
+		return nil, fmt.Errorf("could not unmarshal file %s: %w", fullpath, err)
+	}
+
+	config.ProjectPath = filepath.Base(fullpath)
+
+	return NewProject(config)
+}
+
+func (p *M4bProject) ShowMetadata() (string, error) {
+	audioFiles, err := p.AudioFiles()
 	if err != nil {
 		return "", fmt.Errorf("could not load audio files: %w", err)
 	}
