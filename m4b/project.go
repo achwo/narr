@@ -302,7 +302,7 @@ func (p *M4bProject) getUpdatedFileMetadata(file string) (map[string]string, []s
 	return tags, tagOrder, nil
 }
 
-func (m *M4bProject) getMetadataTags(metadata string) (map[string]string, []string) {
+func (p *M4bProject) getMetadataTags(metadata string) (map[string]string, []string) {
 	var tags = make(map[string]string)
 
 	lines := strings.Split(metadata, "\n")[1:]
