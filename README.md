@@ -37,11 +37,16 @@ Ein Hörbuch von CD zu m4b machen
 ## Entwurf 
 - [x] narr m4b config <dir> => generates a prepared config file
 - [x] narr m4b check chapters <config> => prints chapters with rules applied
-- [ ] narr m4b check metadata <config> => prints metadata with rules applied
+- [x] narr m4b check metadata <config> => prints metadata with rules applied
+    - [regex] delete
+    - [ ] delete
+    - [ ] set
 - [ ] narr m4b check filename <config> => prints filename with rules applied
-- [ ] narr m4b check --no-rules [thing] <config> => prints metadata without rules applied
-- [ ] narr m4b run <config> => make an m4b with all steps
-- [ ] narr m4b run --no-cache <config> => make an m4b with all steps, ignoring previously executed steps
+- [ ] order files always with padding
+- [ ] noChapters
+- [ ] multiproject config value
+- [ ] check --no-rules => prints metadata without rules applied
+- [ ] narr m4b run <dir> => make an m4b with all steps
 
 ## Config
 
@@ -57,8 +62,8 @@ Ein Hörbuch von CD zu m4b machen
 - output file name & folder structure rules: rule[]
     - regex replace (match, format)
     - set (value)
+- multiproject : boolean (if true, every subdir in root is a single project with the same rules as defined root)
 
-- multiproject : boolean (if true, every subdir in root is a single project)
 - keep temp: boolean
 - parallel: boolean
 - executed-steps: step[]
