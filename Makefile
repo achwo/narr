@@ -17,6 +17,12 @@ vet:
 	golint ./...
 	staticcheck ./...
 
+# Run vuln check
+.PHONY: vulncheck
+vulncheck:
+	govulncheck ./...	
+
+
 # Run tests
 .PHONY: test
 test:
