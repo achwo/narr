@@ -12,10 +12,14 @@ func (f *FakeAudioFileProvider) AudioFiles(fullPath string) ([]string, error) {
 	return f.Files, nil
 }
 
-type FakeMetadataProvider struct {
+type FileData struct {
 	Title    string
 	Duration float64
 	Metadata string
+}
+
+type FakeMetadataProvider struct {
+	Data     map[string]FileData
 	ErrTitle error
 	ErrMeta  error
 }
@@ -24,12 +28,15 @@ func (f *FakeMetadataProvider) ReadTitleAndDuration(file string) (string, float6
 	if f.ErrTitle != nil {
 		return "", 0.0, f.ErrTitle
 	}
-	return f.Title, f.Duration, nil
+
+	data := f.Data[file]
+
+	return data.Title, data.Duration, nil
 }
 
 func (f *FakeMetadataProvider) ReadMetadata(file string) (string, error) {
 	if f.ErrMeta != nil {
 		return "", f.ErrMeta
 	}
-	return f.Metadata, nil
+	return f.Data[file].Metadata, nil
 }

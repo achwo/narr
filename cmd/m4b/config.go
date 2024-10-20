@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/achwo/narr/m4b"
 	"github.com/achwo/narr/utils"
@@ -55,34 +54,6 @@ var generateCmd = &cobra.Command{
 var checkCmd = &cobra.Command{
 	Use:   "check <dir>",
 	Short: "Check config for validity",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		path, err := utils.GetValidFullpathFromArgs(args, 0)
-		if err != nil {
-			return fmt.Errorf("could not resolve path %s: %w", args[0], err)
-		}
-
-		var fullpath string
-		if strings.HasSuffix(path, configFileName) {
-			fullpath = path
-		} else {
-			fullpath = filepath.Join(path, configFileName)
-		}
-
-		bytes, err := os.ReadFile(fullpath)
-		if err != nil {
-			return fmt.Errorf("could not read file %s: %w", fullpath, err)
-		}
-
-		var config m4b.ProjectConfig
-		err = yaml.Unmarshal(bytes, &config)
-		if err != nil {
-			return fmt.Errorf("could not unmarshal file %s: %w", fullpath, err)
-		}
-
-		fmt.Println(config)
-
-		return nil
-	},
 }
 
 var chaptersCmd = &cobra.Command{
@@ -163,6 +134,33 @@ var filenameCmd = &cobra.Command{
 	},
 }
 
+var filesCmd = &cobra.Command{
+	Use:   "files <dir>",
+	Short: "Show input files in processing order",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		path, err := utils.GetValidFullpathFromArgs(args, 0)
+		if err != nil {
+			return fmt.Errorf("could not resolve path %s: %w", args[0], err)
+		}
+
+		project, err := m4b.NewProjectFromPath(path, audioFileProvider, metadataProvider)
+		if err != nil {
+			return fmt.Errorf("could not load config %s: %w", path, err)
+		}
+
+		tracks, err := project.Tracks()
+		if err != nil {
+			return fmt.Errorf("Could not get metadata: %w", err)
+		}
+
+		for _, track := range tracks {
+			fmt.Println(track.File)
+		}
+
+		return nil
+	},
+}
+
 func init() {
 	M4bCmd.AddCommand(configCmd)
 	configCmd.AddCommand(generateCmd)
@@ -170,4 +168,5 @@ func init() {
 	checkCmd.AddCommand(chaptersCmd)
 	checkCmd.AddCommand(metadataCmd)
 	checkCmd.AddCommand(filenameCmd)
+	checkCmd.AddCommand(filesCmd)
 }

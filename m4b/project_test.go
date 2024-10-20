@@ -54,9 +54,6 @@ date=2002-09-16`,
 }
 
 func TestShowFilename(t *testing.T) {
-	// Should use metadata
-	// - Author/Title.m4b
-
 	project, err := setupProject()
 	if err != nil {
 		t.Fatal(err)
@@ -71,12 +68,41 @@ func TestShowFilename(t *testing.T) {
 	assert.Equal(t, "Hans Wurst read by George Washington/The Book.m4b", filename)
 }
 
-func setupProject() (*m4b.M4bProject, error) {
+func TestTracks(t *testing.T) {
+	// should return all files within the project folder sorted by cd and track numbers
+	project, err := setupProject()
+
 	fakeAudioProvider := &testutils.FakeAudioFileProvider{
-		Files: []string{"file1.m4a", "file2.m4a"},
+		Files: []string{"file1.m4a", "file2.m4a", "file3.m4a"},
 	}
 
-	fakeMetadataProvider := &testutils.FakeMetadataProvider{
+	data := make(map[string]testutils.FileData)
+
+	data["file1.m4a"] = testutils.FileData{
+		Title:    "Chapter 1",
+		Duration: 5000,
+		Metadata: `;FFMETADATA1
+title=Chapter 02-02: Star dust
+artist=Hans Wurst read by George Washington
+album=The Book
+track=3/16
+disc=1/10
+date=2002-09-16`,
+	}
+
+	data["file2.m4a"] = testutils.FileData{
+		Title:    "Chapter 1",
+		Duration: 5000,
+		Metadata: `;FFMETADATA1
+title=Chapter 02-02: Star dust
+artist=Hans Wurst read by George Washington
+album=The Book
+track=2/16
+disc=1/10
+date=2002-09-16`,
+	}
+
+	data["file3.m4a"] = testutils.FileData{
 		Title:    "Chapter 1",
 		Duration: 5000,
 		Metadata: `;FFMETADATA1
@@ -87,6 +113,60 @@ track=1/16
 disc=2/10
 date=2002-09-16`,
 	}
+
+	fakeMetadataProvider := &testutils.FakeMetadataProvider{Data: data}
+
+	project.MetadataProvider = fakeMetadataProvider
+	project.AudioProvider = fakeAudioProvider
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	files, err := project.Tracks()
+
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	assert.Equal(t, "file2.m4a", files[0].File)
+	assert.Equal(t, "file1.m4a", files[1].File)
+	assert.Equal(t, "file3.m4a", files[2].File)
+
+}
+
+func setupProject() (*m4b.M4bProject, error) {
+	fakeAudioProvider := &testutils.FakeAudioFileProvider{
+		Files: []string{"file1.m4a", "file2.m4a"},
+	}
+
+	data := make(map[string]testutils.FileData)
+
+	data["file1.m4a"] = testutils.FileData{
+		Title:    "Chapter 1",
+		Duration: 5000,
+		Metadata: `;FFMETADATA1
+title=Chapter 02-02: Star dust
+artist=Hans Wurst read by George Washington
+album=The Book
+track=1/16
+disc=2/10
+date=2002-09-16`,
+	}
+
+	data["file2.m4a"] = testutils.FileData{
+		Title:    "Chapter 1",
+		Duration: 5000,
+		Metadata: `;FFMETADATA1
+title=Chapter 02-02: Star dust
+artist=Hans Wurst read by George Washington
+album=The Book
+track=1/16
+disc=2/10
+date=2002-09-16`,
+	}
+
+	fakeMetadataProvider := &testutils.FakeMetadataProvider{Data: data}
 
 	config := m4b.ProjectConfig{AudioFilePath: ".", ChapterRules: []m4b.ChapterRule{}}
 

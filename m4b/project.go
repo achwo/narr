@@ -1,10 +1,13 @@
 package m4b
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
+	"strconv"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -33,13 +36,84 @@ type M4bProject struct {
 	MetadataProvider MetadataProvider
 }
 
-func (p *M4bProject) AudioFiles() ([]string, error) {
+type Track struct {
+	File     string
+	Metadata map[string]string
+	TagOrder []string
+}
+
+func (t *Track) DiscNumber() (int, bool) {
+	disc, exists := t.Metadata["disc"]
+	if !exists || disc == "" {
+		return 0, false
+	}
+
+	parts := strings.Split(disc, "/")
+
+	discNumber, err := strconv.Atoi(parts[0])
+	if err != nil {
+		return 0, false
+	}
+	return discNumber, true
+}
+
+func (t *Track) TrackNumber() (int, bool) {
+	track, exists := t.Metadata["track"]
+	if !exists || track == "" {
+		return 0, false
+	}
+
+	parts := strings.Split(track, "/")
+
+	trackNumber, err := strconv.Atoi(parts[0])
+	if err != nil {
+		return 0, false
+	}
+	return trackNumber, true
+}
+
+func (p *M4bProject) Tracks() ([]Track, error) {
 	fullpath, err := p.Config.FullAudioFilePath()
 	if err != nil {
 		return nil, err
 	}
 
-	return p.AudioProvider.AudioFiles(fullpath)
+	audioFiles, err := p.AudioProvider.AudioFiles(fullpath)
+
+	tracks := make([]Track, 0, len(audioFiles))
+
+	for _, file := range audioFiles {
+		metadata, tagOrder, err := p.getUpdatedFileMetadata(file)
+		if err != nil {
+			return nil, fmt.Errorf("Could not read metadata for '%s': %w", file, err)
+		}
+		track := Track{File: file, Metadata: metadata, TagOrder: tagOrder}
+		tracks = append(tracks, track)
+
+		if _, exists := track.DiscNumber(); !exists {
+			return nil, fmt.Errorf("Track '%s' has no disc number", track.File)
+		}
+	}
+
+	slices.SortFunc(tracks, func(a, b Track) int {
+		discI, discIExists := a.DiscNumber()
+		discJ, discJExists := b.DiscNumber()
+
+		if discIExists && discJExists && discI != discJ {
+			return cmp.Compare(discI, discJ)
+		}
+
+		trackNumberI, trackNumberIExists := a.TrackNumber()
+		trackNumberJ, trackNumberJExists := b.TrackNumber()
+
+		if trackNumberIExists && trackNumberJExists && trackNumberI != trackNumberJ {
+			return cmp.Compare(trackNumberI, trackNumberJ)
+		}
+
+		return strings.Compare(a.File, b.File)
+	})
+
+	return tracks, nil
 }
 
 func NewProject(
@@ -93,20 +167,19 @@ func NewProjectFromPath(
 }
 
 func (p *M4bProject) ShowChapters() (string, error) {
-	audioFiles, err := p.AudioFiles()
+	tracks, err := p.Tracks()
 	if err != nil {
 		return "", fmt.Errorf("Could not load audio files: %w", err)
 	}
 
 	chapters := make(map[string]*Chapter)
-	fmt.Println(audioFiles)
 	var chapterOrder []string
 	var previousChapter *Chapter
 
-	for i, file := range audioFiles {
-		title, duration, err := p.MetadataProvider.ReadTitleAndDuration(file)
+	for i, track := range tracks {
+		title, duration, err := p.MetadataProvider.ReadTitleAndDuration(track.File)
 		if err != nil {
-			return "", fmt.Errorf("Could not read file data for file %s: %w", file, err)
+			return "", fmt.Errorf("Could not read file data for file %s: %w", track, err)
 		}
 		chapterName := title
 
@@ -119,7 +192,7 @@ func (p *M4bProject) ShowChapters() (string, error) {
 
 		value, exists := chapters[chapterName]
 
-		newFile := File{Name: file, Duration: duration}
+		newFile := File{Name: track.File, Duration: duration}
 		if exists {
 			value.addFile(newFile)
 		} else {
@@ -165,7 +238,7 @@ func (p *M4bProject) ShowMetadata() (string, error) {
 }
 
 func (p *M4bProject) ShowFilename() (string, error) {
-	audioFiles, err := p.AudioFiles()
+	audioFiles, err := p.Tracks()
 	if err != nil {
 		return "", fmt.Errorf("could not load audio files: %w", err)
 	}
@@ -196,7 +269,7 @@ func (p *M4bProject) ShowFilename() (string, error) {
 }
 
 func (p *M4bProject) getUpdatedMetadata() (map[string]string, []string, error) {
-	audioFiles, err := p.AudioFiles()
+	audioFiles, err := p.Tracks()
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not load audio files: %w", err)
 	}
@@ -205,9 +278,11 @@ func (p *M4bProject) getUpdatedMetadata() (map[string]string, []string, error) {
 		return nil, nil, errors.New("no audio files found")
 	}
 
-	referenceFile := audioFiles[0]
+	return audioFiles[0].Metadata, audioFiles[0].TagOrder, nil
+}
 
-	metadata, err := p.MetadataProvider.ReadMetadata(referenceFile)
+func (p *M4bProject) getUpdatedFileMetadata(file string) (map[string]string, []string, error) {
+	metadata, err := p.MetadataProvider.ReadMetadata(file)
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not read metadata: %w", err)
 	}
