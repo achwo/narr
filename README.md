@@ -38,10 +38,10 @@ Ein Hörbuch von CD zu m4b machen
 - [x] narr m4b config <dir> => generates a prepared config file
 - [x] narr m4b check chapters <config> => prints chapters with rules applied
 - [x] narr m4b check metadata <config> => prints metadata with rules applied
-    - [regex] delete
+    - [x] regex
     - [ ] delete
     - [ ] set
-- [ ] narr m4b check filename <config> => prints filename with rules applied
+- [x] narr m4b check filename <config> => prints filename with rules applied
 - [ ] order files always with padding
 - [ ] noChapters
 - [ ] multiproject config value
@@ -59,9 +59,6 @@ Ein Hörbuch von CD zu m4b machen
 - chapters: boolean
 - chapter rules: rule[]
     - regex replace (match, format)
-- output file name & folder structure rules: rule[]
-    - regex replace (match, format)
-    - set (value)
 - multiproject : boolean (if true, every subdir in root is a single project with the same rules as defined root)
 
 - keep temp: boolean

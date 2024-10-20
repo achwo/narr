@@ -90,36 +90,3 @@ func (r *ChapterRule) Apply(chapter string) (string, error) {
 	}
 	return utils.ApplyRegex(chapter, regex, r.Format)
 }
-
-type OutputRule struct {
-	Type   string `yaml:"type"`
-	Regex  string `yaml:"regex,omitempty"`
-	Format string `yaml:"format,omitempty"`
-	Value  string `yaml:"value,omitempty"`
-}
-
-func (r *OutputRule) Validate() error {
-	switch r.Type {
-	case "delete":
-		if r.Value != "" || r.Regex != "" || r.Format != "" {
-			return errors.New("delete rule cannot have value, regex, or format")
-		}
-	case "set":
-		if r.Value == "" {
-			return errors.New("set rule requires a value")
-		}
-		if r.Regex != "" || r.Format != "" {
-			return errors.New("set rule cannot have regex or format")
-		}
-	case "regex":
-		if r.Regex == "" || r.Format == "" {
-			return errors.New("regex rule requires both regex and format")
-		}
-		if r.Value != "" {
-			return errors.New("regex rule cannot have value")
-		}
-	default:
-		return fmt.Errorf("unknown rule type: %s", r.Type)
-	}
-	return nil
-}

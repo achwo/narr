@@ -53,6 +53,24 @@ date=2002-09-16`,
 	)
 }
 
+func TestShowFilename(t *testing.T) {
+	// Should use metadata
+	// - Author/Title.m4b
+
+	project, err := setupProject()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	filename, err := project.ShowFilename()
+
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	assert.Equal(t, "Hans Wurst read by George Washington/The Book.m4b", filename)
+}
+
 func setupProject() (*m4b.M4bProject, error) {
 	fakeAudioProvider := &testutils.FakeAudioFileProvider{
 		Files: []string{"file1.m4a", "file2.m4a"},

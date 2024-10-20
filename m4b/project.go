@@ -52,6 +52,10 @@ func NewProject(
 		return nil, err
 	}
 
+	if config.ProjectPath == "" {
+		config.ProjectPath = "."
+	}
+
 	return &M4bProject{
 		Config:           config,
 		AudioProvider:    audioProvider,
@@ -83,7 +87,7 @@ func NewProjectFromPath(
 		return nil, fmt.Errorf("could not unmarshal file %s: %w", fullpath, err)
 	}
 
-	config.ProjectPath = filepath.Base(fullpath)
+	config.ProjectPath = filepath.Dir(fullpath)
 
 	return NewProject(config, audioProvider, metadataProvider)
 }
@@ -144,30 +148,9 @@ func (p *M4bProject) ShowChapters() (string, error) {
 }
 
 func (p *M4bProject) ShowMetadata() (string, error) {
-	audioFiles, err := p.AudioFiles()
+	tags, tagOrder, err := p.getUpdatedMetadata()
 	if err != nil {
-		return "", fmt.Errorf("could not load audio files: %w", err)
-	}
-
-	if len(audioFiles) == 0 {
-		return "", errors.New("no audio files found")
-	}
-
-	referenceFile := audioFiles[0]
-
-	metadata, err := p.MetadataProvider.ReadMetadata(referenceFile)
-
-	tagOrder, tags := p.getMetadataTags(metadata)
-
-	for _, rule := range p.Config.MetadataRules {
-		err = rule.Apply(tags)
-		if err != nil {
-			return "", err
-		}
-	}
-
-	if err != nil {
-		return "", fmt.Errorf("could not read metadata: %w", err)
+		return "", err
 	}
 
 	firstLine := ";FFMETADATA1"
@@ -181,7 +164,67 @@ func (p *M4bProject) ShowMetadata() (string, error) {
 	return strings.Join(lines, "\n"), nil
 }
 
-func (m *M4bProject) getMetadataTags(metadata string) ([]string, map[string]string) {
+func (p *M4bProject) ShowFilename() (string, error) {
+	audioFiles, err := p.AudioFiles()
+	if err != nil {
+		return "", fmt.Errorf("could not load audio files: %w", err)
+	}
+
+	if len(audioFiles) == 0 {
+		return "", errors.New("no audio files found")
+	}
+
+	tags, _, err := p.getUpdatedMetadata()
+
+	if err != nil {
+		return "", fmt.Errorf("could not get metadata: %w", err)
+	}
+
+	artist, exists := tags["artist"]
+	if !exists {
+		return "", errors.New("no artist found in metadata")
+	}
+
+	album, exists := tags["album"]
+	if !exists {
+		return "", errors.New("no album found in metadata")
+	}
+
+	filename := filepath.Join(p.Config.ProjectPath, artist, album+".m4b")
+
+	return filename, nil
+}
+
+func (p *M4bProject) getUpdatedMetadata() (map[string]string, []string, error) {
+	audioFiles, err := p.AudioFiles()
+	if err != nil {
+		return nil, nil, fmt.Errorf("could not load audio files: %w", err)
+	}
+
+	if len(audioFiles) == 0 {
+		return nil, nil, errors.New("no audio files found")
+	}
+
+	referenceFile := audioFiles[0]
+
+	metadata, err := p.MetadataProvider.ReadMetadata(referenceFile)
+	if err != nil {
+		return nil, nil, fmt.Errorf("could not read metadata: %w", err)
+	}
+
+	tags, tagOrder := p.getMetadataTags(metadata)
+
+	for _, rule := range p.Config.MetadataRules {
+		err = rule.Apply(tags)
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+
+	return tags, tagOrder, nil
+}
+
+func (m *M4bProject) getMetadataTags(metadata string) (map[string]string, []string) {
 	var tags = make(map[string]string)
 
 	lines := strings.Split(metadata, "\n")[1:]
@@ -202,5 +245,5 @@ func (m *M4bProject) getMetadataTags(metadata string) ([]string, map[string]stri
 		tags[split[0]] = split[1]
 	}
 
-	return tagOrder, tags
+	return tags, tagOrder
 }

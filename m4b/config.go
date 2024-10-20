@@ -12,7 +12,6 @@ type ProjectConfig struct {
 	HasChapters   bool           `yaml:"hasChapters"`
 	MetadataRules []MetadataRule `yaml:"metadataRules"`
 	ChapterRules  []ChapterRule  `yaml:"chapterRules"`
-	OutputRules   []OutputRule   `yaml:"outputRules"`
 	ProjectPath   string         `yaml:"projectPath,omitempty"`
 }
 
@@ -32,13 +31,6 @@ func (c *ProjectConfig) Validate() error {
 		err := rule.Validate()
 		if err != nil {
 			return fmt.Errorf("Chapter rule invalid: %w", err)
-		}
-	}
-
-	for _, rule := range c.OutputRules {
-		err := rule.Validate()
-		if err != nil {
-			return fmt.Errorf("Output rule invalid: %w", err)
 		}
 	}
 

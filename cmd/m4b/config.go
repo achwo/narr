@@ -38,7 +38,6 @@ var generateCmd = &cobra.Command{
 			HasChapters:   false,
 			MetadataRules: []m4b.MetadataRule{},
 			ChapterRules:  []m4b.ChapterRule{},
-			OutputRules:   []m4b.OutputRule{},
 		}
 
 		jsonBytes, err := yaml.Marshal(emptyConfig)
@@ -139,10 +138,36 @@ var metadataCmd = &cobra.Command{
 	},
 }
 
+var filenameCmd = &cobra.Command{
+	Use:   "filename <dir>",
+	Short: "Show filename with applied rules",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		path, err := utils.GetValidFullpathFromArgs(args, 0)
+		if err != nil {
+			return fmt.Errorf("could not resolve path %s: %w", args[0], err)
+		}
+
+		project, err := m4b.NewProjectFromPath(path, audioFileProvider, metadataProvider)
+		if err != nil {
+			return fmt.Errorf("could not load config %s: %w", path, err)
+		}
+
+		filename, err := project.ShowFilename()
+		if err != nil {
+			return fmt.Errorf("Could not get metadata: %w", err)
+		}
+
+		fmt.Println(filename)
+
+		return nil
+	},
+}
+
 func init() {
 	M4bCmd.AddCommand(configCmd)
 	configCmd.AddCommand(generateCmd)
 	configCmd.AddCommand(checkCmd)
 	checkCmd.AddCommand(chaptersCmd)
 	checkCmd.AddCommand(metadataCmd)
+	checkCmd.AddCommand(filenameCmd)
 }
