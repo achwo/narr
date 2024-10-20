@@ -79,19 +79,22 @@ func (p *M4bProject) Tracks() ([]Track, error) {
 	}
 
 	audioFiles, err := p.AudioProvider.AudioFiles(fullpath)
+	if err != nil {
+		return nil, err
+	}
 
 	tracks := make([]Track, 0, len(audioFiles))
 
 	for _, file := range audioFiles {
 		metadata, tagOrder, err := p.getUpdatedFileMetadata(file)
 		if err != nil {
-			return nil, fmt.Errorf("Could not read metadata for '%s': %w", file, err)
+			return nil, fmt.Errorf("could not read metadata for '%s': %w", file, err)
 		}
 		track := Track{File: file, Metadata: metadata, TagOrder: tagOrder}
 		tracks = append(tracks, track)
 
 		if _, exists := track.DiscNumber(); !exists {
-			return nil, fmt.Errorf("Track '%s' has no disc number", track.File)
+			return nil, fmt.Errorf("track '%s' has no disc number", track.File)
 		}
 	}
 
@@ -169,7 +172,7 @@ func NewProjectFromPath(
 func (p *M4bProject) ShowChapters() (string, error) {
 	tracks, err := p.Tracks()
 	if err != nil {
-		return "", fmt.Errorf("Could not load audio files: %w", err)
+		return "", fmt.Errorf("could not load audio files: %w", err)
 	}
 
 	chapters := make(map[string]*Chapter)
@@ -179,14 +182,14 @@ func (p *M4bProject) ShowChapters() (string, error) {
 	for i, track := range tracks {
 		title, duration, err := p.MetadataProvider.ReadTitleAndDuration(track.File)
 		if err != nil {
-			return "", fmt.Errorf("Could not read file data for file %s: %w", track, err)
+			return "", fmt.Errorf("could not read file data for file %s: %w", track, err)
 		}
 		chapterName := title
 
 		for _, rule := range p.Config.ChapterRules {
 			chapterName, err = rule.Apply(chapterName)
 			if err != nil {
-				return "", fmt.Errorf("Chapter rule invalid: %w", err)
+				return "", fmt.Errorf("chapter rule invalid: %w", err)
 			}
 		}
 

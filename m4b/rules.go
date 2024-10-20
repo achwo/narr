@@ -20,7 +20,7 @@ func (r *MetadataRule) Apply(tags map[string]string) error {
 	value, exists := tags[r.Tag]
 
 	if !exists {
-		return fmt.Errorf("Tag %s does not exist", r.Tag)
+		return fmt.Errorf("tag %s does not exist", r.Tag)
 	}
 
 	// TODO: implement delete, set
@@ -30,9 +30,13 @@ func (r *MetadataRule) Apply(tags map[string]string) error {
 		regex, err := regexp.Compile(r.Regex)
 		if err != nil {
 			// TODO: might be better in construction (want to know validity in config check also)
-			return fmt.Errorf("Metadata rule regex '%s' is invalid: %w", r.Regex, err)
+			return fmt.Errorf("metadata rule regex '%s' is invalid: %w", r.Regex, err)
 		}
 		newValue, err := utils.ApplyRegex(value, regex, r.Format)
+		if err != nil {
+			// TODO: might be better in construction (want to know validity in config check also)
+			return fmt.Errorf("could not apply rule '%s': %w", r.Regex, err)
+		}
 		tags[r.Tag] = newValue
 	default:
 		return errors.ErrUnsupported

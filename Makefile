@@ -14,6 +14,7 @@ fmt:
 .PHONY: vet
 vet:
 	go vet ./...
+	staticcheck ./...
 
 # Run tests
 .PHONY: test

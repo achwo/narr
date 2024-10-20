@@ -11,8 +11,6 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-const configFileName = "narr.yaml"
-
 var metadataProvider m4b.MetadataProvider = &utils.FFmpegMetadataProvider{}
 var audioFileProvider m4b.AudioFileProvider = &utils.OSAudioFileProvider{}
 
@@ -72,7 +70,7 @@ var chaptersCmd = &cobra.Command{
 
 		chaptersContent, err := project.ShowChapters()
 		if err != nil {
-			return fmt.Errorf("Could not get chapters: %w", err)
+			return fmt.Errorf("could not get chapters: %w", err)
 		}
 
 		fmt.Println(chaptersContent)
@@ -100,7 +98,7 @@ var metadataCmd = &cobra.Command{
 
 		metadata, err := project.ShowMetadata()
 		if err != nil {
-			return fmt.Errorf("Could not get metadata: %w", err)
+			return fmt.Errorf("could not get metadata: %w", err)
 		}
 
 		fmt.Println(metadata)
@@ -125,7 +123,7 @@ var filenameCmd = &cobra.Command{
 
 		filename, err := project.ShowFilename()
 		if err != nil {
-			return fmt.Errorf("Could not get metadata: %w", err)
+			return fmt.Errorf("could not get metadata: %w", err)
 		}
 
 		fmt.Println(filename)
@@ -150,7 +148,7 @@ var filesCmd = &cobra.Command{
 
 		tracks, err := project.Tracks()
 		if err != nil {
-			return fmt.Errorf("Could not get metadata: %w", err)
+			return fmt.Errorf("could not get metadata: %w", err)
 		}
 
 		for _, track := range tracks {

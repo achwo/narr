@@ -30,6 +30,9 @@ var editCmd = &cobra.Command{
 		}
 
 		files, err := utils.GetFilesByExtension(path, ".m4b")
+		if err != nil {
+			return fmt.Errorf("could not get files: %w", err)
+		}
 
 		metadataManager := &utils.FFmpegMetadataProvider{}
 
