@@ -42,11 +42,10 @@ Ein Hörbuch von CD zu m4b machen
     - [ ] delete
     - [ ] set
 - [x] narr m4b check filename <config> => prints filename with rules applied
-- [ ] order files always with padding
-- [ ] noChapters
-- [ ] multiproject config value
-- [ ] check --no-rules => prints metadata without rules applied
+- [x] order files always with padding
 - [ ] narr m4b run <dir> => make an m4b with all steps
+    - [ ] noChapters
+- [ ] multiproject config value
 
 ## Config
 
