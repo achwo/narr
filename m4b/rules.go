@@ -35,7 +35,7 @@ func (r *MetadataRule) Apply(tags map[string]string) error {
 		newValue, err := utils.ApplyRegex(value, regex, r.Format)
 		if err != nil {
 			// TODO: might be better in construction (want to know validity in config check also)
-			return fmt.Errorf("could not apply rule '%s': w", r.Regex, err)
+			return fmt.Errorf("could not apply rule '%s': %w", r.Regex, err)
 		}
 		tags[r.Tag] = newValue
 	default:

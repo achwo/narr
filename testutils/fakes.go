@@ -40,3 +40,29 @@ func (f *FakeMetadataProvider) ReadMetadata(file string) (string, error) {
 	}
 	return f.Data[file].Metadata, nil
 }
+
+type FakeAudioProcessor struct{}
+
+// AddChapters implements m4b.AudioProcessor.
+func (c *FakeAudioProcessor) AddChapters(m4bFile string, chapters string) error {
+	panic("unimplemented")
+}
+
+// AddCover implements m4b.AudioProcessor.
+func (c *FakeAudioProcessor) AddCover(m4bFile string, coverFile string) error {
+	panic("unimplemented")
+}
+
+// AddMetadata implements m4b.AudioProcessor.
+func (c *FakeAudioProcessor) AddMetadata(m4bFile string, metadata string) error {
+	panic("unimplemented")
+}
+
+// Concat implements m4b.AudioProcessor.
+func (c *FakeAudioProcessor) Concat(files []string, output string) error {
+	return nil
+}
+
+func (c *FakeAudioProcessor) ToM4A(files []string) ([]string, error) {
+	return nil, nil
+}

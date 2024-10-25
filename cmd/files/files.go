@@ -4,7 +4,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// fileCmd represents the file command
+// FilesCmd represents the file command
 var FilesCmd = &cobra.Command{
 	Use: "file",
 }

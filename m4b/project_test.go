@@ -14,7 +14,7 @@ func TestShowChapters(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	chapters, err := project.ShowChapters()
+	chapters, err := project.Chapters()
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -35,7 +35,7 @@ func TestShowMetadata(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	metadata, err := project.ShowMetadata()
+	metadata, err := project.Metadata()
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -59,7 +59,7 @@ func TestShowFilename(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	filename, err := project.ShowFilename()
+	filename, err := project.Filename()
 
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
@@ -117,7 +117,7 @@ date=2002-09-16`,
 	fakeMetadataProvider := &testutils.FakeMetadataProvider{Data: data}
 
 	project.MetadataProvider = fakeMetadataProvider
-	project.AudioProvider = fakeAudioProvider
+	project.AudioFileProvider = fakeAudioProvider
 
 	if err != nil {
 		t.Fatal(err)
@@ -167,8 +167,9 @@ date=2002-09-16`,
 	}
 
 	fakeMetadataProvider := &testutils.FakeMetadataProvider{Data: data}
+	fakeAudioConverter := &testutils.FakeAudioProcessor{}
 
 	config := m4b.ProjectConfig{AudioFilePath: ".", ChapterRules: []m4b.ChapterRule{}}
 
-	return m4b.NewProject(config, fakeAudioProvider, fakeMetadataProvider)
+	return m4b.NewProject(config, fakeAudioProvider, fakeMetadataProvider, fakeAudioConverter)
 }

@@ -7,7 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
-	"strconv"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -15,8 +14,69 @@ import (
 
 const configFileName = "narr.yaml"
 
+func NewProjectFromPath(
+	path string,
+	audioProvider AudioFileProvider,
+	metadataProvider MetadataProvider,
+	audioConverter AudioProcessor,
+) (*M4bProject, error) {
+	var fullpath string
+
+	if strings.HasSuffix(path, configFileName) {
+		fullpath = path
+	} else {
+		fullpath = filepath.Join(path, configFileName)
+	}
+
+	bytes, err := os.ReadFile(fullpath)
+	if err != nil {
+		return nil, fmt.Errorf("could not read file %s: %w", fullpath, err)
+	}
+
+	var config ProjectConfig
+	err = yaml.Unmarshal(bytes, &config)
+	if err != nil {
+		return nil, fmt.Errorf("could not unmarshal file %s: %w", fullpath, err)
+	}
+
+	config.ProjectPath = filepath.Dir(fullpath)
+
+	return NewProject(config, audioProvider, metadataProvider, audioConverter)
+}
+
+func NewProject(
+	config ProjectConfig,
+	audioProvider AudioFileProvider,
+	metadataProvider MetadataProvider,
+	audioConverter AudioProcessor,
+) (*M4bProject, error) {
+	err := config.Validate()
+	if err != nil {
+		return nil, err
+	}
+
+	if config.ProjectPath == "" {
+		config.ProjectPath = "."
+	}
+
+	return &M4bProject{
+		Config:            config,
+		AudioFileProvider: audioProvider,
+		MetadataProvider:  metadataProvider,
+		AudioProcessor:    audioConverter,
+	}, nil
+}
+
 type AudioFileProvider interface {
 	AudioFiles(fullPath string) ([]string, error)
+}
+
+type AudioProcessor interface {
+	ToM4A(files []string) ([]string, error)
+	Concat(m4aFiles []string, output string) error
+	AddMetadata(m4bFile string, metadata string) error
+	AddCover(m4bFile string, coverFile string) error
+	AddChapters(m4bFile string, chapters string) error
 }
 
 type MetadataProvider interface {
@@ -31,45 +91,70 @@ type Project interface {
 }
 
 type M4bProject struct {
-	Config           ProjectConfig
-	AudioProvider    AudioFileProvider
-	MetadataProvider MetadataProvider
+	Config            ProjectConfig
+	AudioFileProvider AudioFileProvider
+	MetadataProvider  MetadataProvider
+	AudioProcessor    AudioProcessor
 }
 
-type Track struct {
-	File     string
-	Metadata map[string]string
-	TagOrder []string
-}
-
-func (t *Track) DiscNumber() (int, bool) {
-	disc, exists := t.Metadata["disc"]
-	if !exists || disc == "" {
-		return 0, false
-	}
-
-	parts := strings.Split(disc, "/")
-
-	discNumber, err := strconv.Atoi(parts[0])
+func (p *M4bProject) ConvertToM4B() (string, error) {
+	tracks, err := p.Tracks()
 	if err != nil {
-		return 0, false
-	}
-	return discNumber, true
-}
-
-func (t *Track) TrackNumber() (int, bool) {
-	track, exists := t.Metadata["track"]
-	if !exists || track == "" {
-		return 0, false
+		return "", fmt.Errorf("could not load audio files: %w", err)
 	}
 
-	parts := strings.Split(track, "/")
+	files := make([]string, 0, len(tracks))
 
-	trackNumber, err := strconv.Atoi(parts[0])
+	for _, track := range tracks {
+		files = append(files, track.File)
+	}
+
+	fmt.Println("Converting files to m4a")
+	m4aFiles, err := p.AudioProcessor.ToM4A(files)
 	if err != nil {
-		return 0, false
+		return "", fmt.Errorf("Could not convert files to m4a: %w", err)
 	}
-	return trackNumber, true
+
+	fmt.Println("Concating files")
+	m4bFile, err := p.Filename()
+	if err != nil {
+		return "", fmt.Errorf("Could not get filename: %w", err)
+	}
+
+	err = p.AudioProcessor.Concat(m4aFiles, m4bFile)
+	if err != nil {
+		return "", fmt.Errorf("Could not concat files: %w", err)
+	}
+
+	fmt.Println("Adding metadata to m4b")
+	metadata, err := p.Metadata()
+	if err != nil {
+		return "", fmt.Errorf("Could not get metadata: %w", err)
+	}
+
+	err = p.AudioProcessor.AddMetadata(m4bFile, metadata)
+	if err != nil {
+		return "", fmt.Errorf("Could not add metadata to %s: %w", m4bFile, err)
+	}
+
+	fmt.Println("Adding cover to m4b")
+	err = p.AudioProcessor.AddCover(m4bFile, p.Config.CoverPath)
+	if err != nil {
+		return "", fmt.Errorf("Could not add cover to %s: %w", m4bFile, err)
+	}
+
+	fmt.Println("Adding chapters to m4b")
+	chapters, err := p.Chapters()
+	if err != nil {
+		return "", fmt.Errorf("Could not get chapters: %w", err)
+	}
+
+	err = p.AudioProcessor.AddChapters(m4bFile, chapters)
+	if err != nil {
+		return "", fmt.Errorf("Could not add chapters to %s: %w", m4bFile, err)
+	}
+
+	return m4bFile, nil
 }
 
 func (p *M4bProject) Tracks() ([]Track, error) {
@@ -78,7 +163,7 @@ func (p *M4bProject) Tracks() ([]Track, error) {
 		return nil, err
 	}
 
-	audioFiles, err := p.AudioProvider.AudioFiles(fullpath)
+	audioFiles, err := p.AudioFileProvider.AudioFiles(fullpath)
 	if err != nil {
 		return nil, err
 	}
@@ -119,57 +204,7 @@ func (p *M4bProject) Tracks() ([]Track, error) {
 	return tracks, nil
 }
 
-func NewProject(
-	config ProjectConfig,
-	audioProvider AudioFileProvider,
-	metadataProvider MetadataProvider,
-) (*M4bProject, error) {
-	err := config.Validate()
-	if err != nil {
-		return nil, err
-	}
-
-	if config.ProjectPath == "" {
-		config.ProjectPath = "."
-	}
-
-	return &M4bProject{
-		Config:           config,
-		AudioProvider:    audioProvider,
-		MetadataProvider: metadataProvider,
-	}, nil
-}
-
-func NewProjectFromPath(
-	path string,
-	audioProvider AudioFileProvider,
-	metadataProvider MetadataProvider,
-) (*M4bProject, error) {
-	var fullpath string
-
-	if strings.HasSuffix(path, configFileName) {
-		fullpath = path
-	} else {
-		fullpath = filepath.Join(path, configFileName)
-	}
-
-	bytes, err := os.ReadFile(fullpath)
-	if err != nil {
-		return nil, fmt.Errorf("could not read file %s: %w", fullpath, err)
-	}
-
-	var config ProjectConfig
-	err = yaml.Unmarshal(bytes, &config)
-	if err != nil {
-		return nil, fmt.Errorf("could not unmarshal file %s: %w", fullpath, err)
-	}
-
-	config.ProjectPath = filepath.Dir(fullpath)
-
-	return NewProject(config, audioProvider, metadataProvider)
-}
-
-func (p *M4bProject) ShowChapters() (string, error) {
+func (p *M4bProject) Chapters() (string, error) {
 	tracks, err := p.Tracks()
 	if err != nil {
 		return "", fmt.Errorf("could not load audio files: %w", err)
@@ -223,7 +258,7 @@ func (p *M4bProject) ShowChapters() (string, error) {
 	return markersFileContent, nil
 }
 
-func (p *M4bProject) ShowMetadata() (string, error) {
+func (p *M4bProject) Metadata() (string, error) {
 	tags, tagOrder, err := p.getUpdatedMetadata()
 	if err != nil {
 		return "", err
@@ -240,7 +275,7 @@ func (p *M4bProject) ShowMetadata() (string, error) {
 	return strings.Join(lines, "\n"), nil
 }
 
-func (p *M4bProject) ShowFilename() (string, error) {
+func (p *M4bProject) Filename() (string, error) {
 	audioFiles, err := p.Tracks()
 	if err != nil {
 		return "", fmt.Errorf("could not load audio files: %w", err)
