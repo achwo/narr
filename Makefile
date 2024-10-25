@@ -49,3 +49,6 @@ clean:
 .PHONY: dev
 dev: fmt vet run
 
+.PHONY: generate-test-files
+generate-test-files:
+	go run ./bin test.m4a
