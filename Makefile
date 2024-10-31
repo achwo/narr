@@ -43,7 +43,9 @@ run: build
 clean:
 	go clean
 	rm -f $(BINARY_NAME)
-	rm -f demo/*
+	rm -f demo/concat.m4b
+	rm -f demo/filelist.txt
+	rm -rf demo/m4a
 
 # Run the Go project (shortcut)
 .PHONY: dev
