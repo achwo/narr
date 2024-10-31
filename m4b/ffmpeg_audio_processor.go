@@ -3,21 +3,23 @@ package m4b
 import (
 	"bytes"
 	"fmt"
+	"os"
 	"path"
 	"path/filepath"
+	"strings"
 )
 
 type FFmpegAudioProcessor struct {
 	Command Command
 }
 
-func (c *FFmpegAudioProcessor) ToM4A(files []string, outputPath string) ([]string, error) {
+func (p *FFmpegAudioProcessor) ToM4A(files []string, outputPath string) ([]string, error) {
 	outputFiles := make([]string, 0, len(files))
 	for _, file := range files {
 		fileName := filepath.Base(file)
 		out := path.Join(outputPath, fileName)
 		outputFiles = append(outputFiles, out)
-		cmd := c.Command.Create("ffmpeg", "-i", file, "-c", "copy", "-c:a", "aac_at", out)
+		cmd := p.Command.Create("ffmpeg", "-i", file, "-c", "copy", "-c:a", "aac_at", out)
 
 		var outBuf bytes.Buffer
 		err := cmd.Run(&outBuf, &outBuf)
@@ -31,18 +33,53 @@ func (c *FFmpegAudioProcessor) ToM4A(files []string, outputPath string) ([]strin
 	return outputFiles, nil
 }
 
-func (f *FFmpegAudioProcessor) Concat(files []string, output string) error {
+func (p *FFmpegAudioProcessor) Concat(files []string, filelistFile string, outputPath string) (string, error) {
+	err := os.WriteFile(filelistFile, []byte(p.filelistFileContent(files)), 0600)
+	if err != nil {
+		return "", fmt.Errorf("could not write filelist file: %w", err)
+	}
+
+	outputFilepath := filepath.Join(outputPath, "concat.m4b")
+
+	cmd := p.Command.Create(
+		"ffmpeg",
+		"-f",
+		"concat",
+		"-safe",
+		"0",
+		"-i",
+		filelistFile,
+		"-c",
+		"copy",
+		"-vn",
+		outputFilepath,
+	)
+	var outBuf bytes.Buffer
+	err = cmd.Run(&outBuf, &outBuf)
+	if err != nil {
+		fmt.Println(outBuf.String())
+		return "", fmt.Errorf("could not concat files: %w", err)
+	}
+
+	return outputFilepath, nil
+}
+
+func (p *FFmpegAudioProcessor) filelistFileContent(files []string) string {
+	var sb strings.Builder
+	for _, file := range files {
+		fmt.Fprintf(&sb, "file '%s'\n", file)
+	}
+	return sb.String()
+}
+
+func (p *FFmpegAudioProcessor) AddChapters(m4bFile string, chapters string) error {
 	return nil
 }
 
-func (f *FFmpegAudioProcessor) AddChapters(m4bFile string, chapters string) error {
+func (p *FFmpegAudioProcessor) AddCover(m4bFile string, coverFile string) error {
 	return nil
 }
 
-func (f *FFmpegAudioProcessor) AddCover(m4bFile string, coverFile string) error {
-	return nil
-}
-
-func (f *FFmpegAudioProcessor) AddMetadata(m4bFile string, metadata string) error {
+func (p *FFmpegAudioProcessor) AddMetadata(m4bFile string, metadata string) error {
 	return nil
 }

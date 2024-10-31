@@ -2,9 +2,11 @@ package m4b
 
 import (
 	"bytes"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestFFmpegAudioProcessor_ToM4A(t *testing.T) {
@@ -40,6 +42,39 @@ func TestFFmpegAudioProcessor_ToM4A(t *testing.T) {
 	)
 
 	assert.True(t, fakeCommand.Cmd.Executed)
+}
+
+func TestFFmpegAudioProcessor_Concat(t *testing.T) {
+	fakeCommand := FakeCommand{}
+	processor := &FFmpegAudioProcessor{
+		Command: &fakeCommand,
+	}
+	inputFiles := []string{"filepath1.m4a", "filepath2.m4a"}
+	outputPath := "./output"
+
+	filelistFile, err := os.CreateTemp("", "filelist")
+	require.NoError(t, err)
+	defer os.Remove(filelistFile.Name())
+
+	result, err := processor.Concat(inputFiles, filelistFile.Name(), outputPath)
+
+	if err != nil {
+		t.Errorf("Concat failed: %v", err)
+	}
+
+	expectedFilelistContent := "file 'filepath1.m4a'\nfile 'filepath2.m4a'\n"
+
+	actualContent, err := os.ReadFile(filelistFile.Name())
+	require.NoError(t, err)
+	require.Equal(t, expectedFilelistContent, string(actualContent))
+
+	assert.Equal(t, "output/concat.m4b", result)
+
+	assert.Equal(
+		t,
+		[]string{"ffmpeg", "-f", "concat", "-safe", "0", "-i", filelistFile.Name(), "-c", "copy", "-vn", "output/concat.m4b"},
+		fakeCommand.CreatedCommands[0],
+	)
 }
 
 type FakeCommand struct {

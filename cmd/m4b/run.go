@@ -18,6 +18,9 @@ var runCmd = &cobra.Command{
 		}
 
 		project, err := m4b.NewProjectFromPath(path, audioFileProvider, metadataProvider, audioConverter)
+		if err != nil {
+			return fmt.Errorf("could not create project: %w", err)
+		}
 
 		outputPath, err := project.ConvertToM4B()
 		if err != nil {
