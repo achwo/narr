@@ -167,7 +167,7 @@ date=2002-09-16`,
 	}
 
 	fakeMetadataProvider := &testutils.FakeMetadataProvider{Data: data}
-	fakeAudioConverter := &testutils.FakeAudioProcessor{}
+	fakeAudioConverter := &m4b.NullAudioProcessor{}
 
 	config := m4b.ProjectConfig{AudioFilePath: ".", ChapterRules: []m4b.ChapterRule{}}
 

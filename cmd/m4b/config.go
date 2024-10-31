@@ -13,7 +13,9 @@ import (
 
 var metadataProvider m4b.MetadataProvider = &utils.FFmpegMetadataProvider{}
 var audioFileProvider m4b.AudioFileProvider = &utils.OSAudioFileProvider{}
-var audioConverter m4b.AudioProcessor = &m4b.NullAudioProcessor{}
+var audioConverter m4b.AudioProcessor = &m4b.FFmpegAudioProcessor{
+	Command: &m4b.ExecCommand{},
+}
 
 var configCmd = &cobra.Command{
 	Use:   "config",

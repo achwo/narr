@@ -72,7 +72,7 @@ type AudioFileProvider interface {
 }
 
 type AudioProcessor interface {
-	ToM4A(files []string) ([]string, error)
+	ToM4A(files []string, outputPath string) ([]string, error)
 	Concat(m4aFiles []string, output string) error
 	AddMetadata(m4bFile string, metadata string) error
 	AddCover(m4bFile string, coverFile string) error
@@ -109,8 +109,13 @@ func (p *M4bProject) ConvertToM4B() (string, error) {
 		files = append(files, track.File)
 	}
 
-	fmt.Println("Converting files to m4a")
-	m4aFiles, err := p.AudioProcessor.ToM4A(files)
+	fmt.Printf("Converting %d files to m4a\n", len(files))
+	m4aPath, err := p.m4aPath()
+	if err != nil {
+		return "", fmt.Errorf("Could not create m4a path: %w", err)
+	}
+
+	m4aFiles, err := p.AudioProcessor.ToM4A(files, m4aPath)
 	if err != nil {
 		return "", fmt.Errorf("Could not convert files to m4a: %w", err)
 	}
@@ -335,6 +340,16 @@ func (p *M4bProject) getUpdatedFileMetadata(file string) (map[string]string, []s
 	}
 
 	return tags, tagOrder, nil
+}
+
+func (p *M4bProject) m4aPath() (string, error) {
+	m4aPath := filepath.Join(p.Config.ProjectPath, "m4a")
+
+	err := os.Mkdir(m4aPath, 0755)
+	if err != nil {
+		return "", err
+	}
+	return m4aPath, nil
 }
 
 func (p *M4bProject) getMetadataTags(metadata string) (map[string]string, []string) {
