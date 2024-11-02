@@ -5,7 +5,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -20,25 +19,25 @@ func TestFFmpegAudioProcessor_ToM4A(t *testing.T) {
 	files, err := processor.ToM4A(inputFiles, output)
 	require.NoError(t, err)
 
-	assert.Equal(
+	require.Equal(
 		t,
 		[]string{"ffmpeg", "-i", "filepath1.m4a", "-c", "copy", "-c:a", "aac_at", "output/filepath1.m4a"},
 		fakeCommand.CreatedCommands[0],
 	)
 
-	assert.Equal(
+	require.Equal(
 		t,
 		[]string{"ffmpeg", "-i", "filepath2.m4a", "-c", "copy", "-c:a", "aac_at", "output/filepath2.m4a"},
 		fakeCommand.CreatedCommands[1],
 	)
 
-	assert.Equal(
+	require.Equal(
 		t,
 		[]string{"output/filepath1.m4a", "output/filepath2.m4a"},
 		files,
 	)
 
-	assert.True(t, fakeCommand.Cmd.Executed)
+	require.True(t, fakeCommand.Cmd.Executed)
 }
 
 func TestFFmpegAudioProcessor_Concat(t *testing.T) {
@@ -62,9 +61,9 @@ func TestFFmpegAudioProcessor_Concat(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, expectedFilelistContent, string(actualContent))
 
-	assert.Equal(t, "output/concat.m4b", result)
+	require.Equal(t, "output/concat.m4b", result)
 
-	assert.Equal(
+	require.Equal(
 		t,
 		[]string{"ffmpeg", "-f", "concat", "-safe", "0", "-i", filelistFile.Name(), "-c", "copy", "-vn", "output/concat.m4b"},
 		fakeCommand.CreatedCommands[0],
@@ -74,9 +73,9 @@ func TestFFmpegAudioProcessor_Concat(t *testing.T) {
 func TestFFmpegAudioProcessor_AddChapters(t *testing.T) {
 	fakeCommand := FakeCommand{}
 	processor := &FFmpegAudioProcessor{Command: &fakeCommand}
-	inputFile := "bla/filepath1.m4b"
+	inputFile := "filepath1.m4b"
 	chaptersContent := "chapters"
-	chaptersFile := "bla/filepath1.chapters.txt"
+	chaptersFile := "filepath1.chapters.txt"
 	defer os.Remove(chaptersFile)
 
 	err := processor.AddChapters(inputFile, chaptersContent)
@@ -90,9 +89,57 @@ func TestFFmpegAudioProcessor_AddChapters(t *testing.T) {
 	require.Len(t, fakeCommand.CreatedCommands, 1)
 	require.Equal(
 		t,
-		[]string{"mp4chaps", "--import", "bla/filepath1.m4b"},
+		[]string{"mp4chaps", "--import", inputFile},
 		fakeCommand.CreatedCommands[0],
 	)
+	require.True(t, fakeCommand.Cmd.Executed)
+}
+
+func TestFFmpegAudioProcessor_AddMetadata(t *testing.T) {
+	fakeCommand := FakeCommand{}
+	processor := &FFmpegAudioProcessor{Command: &fakeCommand}
+	inputFile := "filepath1.m4b"
+	metadataContent := "metadata"
+	bookTitle := "booktitle"
+	metadataFile := "filepath1.metadata"
+	defer os.Remove(metadataFile)
+	outputFile := "filepath1.withMetadata.m4b"
+	// create output file to check that it is deleted
+	os.WriteFile(outputFile, []byte{}, 0600)
+	t.Cleanup(func() {
+		_ = os.Remove(outputFile)
+	})
+
+	err := processor.AddMetadata(inputFile, metadataContent, bookTitle)
+	require.NoError(t, err)
+
+	actualContent, err := os.ReadFile(metadataFile)
+	require.NoError(t, err)
+	require.Equal(t, metadataContent, string(actualContent))
+
+	require.Len(t, fakeCommand.CreatedCommands, 1)
+	require.Equal(
+		t,
+		[]string{
+			"ffmpeg",
+			"-i",
+			inputFile,
+			"-i",
+			metadataFile,
+			"-map_metadata",
+			"1",
+			"-c",
+			"copy",
+			"-metadata",
+			"title=booktitle",
+			outputFile,
+		},
+		fakeCommand.CreatedCommands[0],
+	)
+	require.True(t, fakeCommand.Cmd.Executed)
+
+	_, err = os.Stat(outputFile)
+	require.True(t, os.IsNotExist(err), "Output file should not exist")
 }
 
 type FakeCommand struct {

@@ -19,6 +19,6 @@ func (p *NullAudioProcessor) AddCover(m4bFile string, coverFile string) error {
 	return nil
 }
 
-func (p *NullAudioProcessor) AddMetadata(m4bFile string, metadata string) error {
+func (p *NullAudioProcessor) AddMetadata(m4bFile string, metadata string, bookTitle string) error {
 	return nil
 }

@@ -74,7 +74,7 @@ type AudioFileProvider interface {
 type AudioProcessor interface {
 	ToM4A(files []string, outputPath string) ([]string, error)
 	Concat(m4aFiles []string, templateFilePath string, outputPath string) (string, error)
-	AddMetadata(m4bFile string, metadata string) error
+	AddMetadata(m4bFile string, metadata string, bookTitle string) error
 	AddCover(m4bFile string, coverFile string) error
 	AddChapters(m4bFile string, chapters string) error
 }
@@ -137,7 +137,12 @@ func (p *M4bProject) ConvertToM4B() (string, error) {
 		return "", fmt.Errorf("could not get metadata: %w", err)
 	}
 
-	err = p.AudioProcessor.AddMetadata(m4bFile, metadata)
+	_, bookTitle, err := p.ArtistAndBookTitle()
+	if err != nil {
+		return "", fmt.Errorf("could not read book title: %w", err)
+	}
+
+	err = p.AudioProcessor.AddMetadata(m4bFile, metadata, bookTitle)
 	if err != nil {
 		return "", fmt.Errorf("could not add metadata to %s: %w", m4bFile, err)
 	}
@@ -281,34 +286,42 @@ func (p *M4bProject) Metadata() (string, error) {
 }
 
 func (p *M4bProject) Filename() (string, error) {
+	artist, album, err := p.ArtistAndBookTitle()
+	if err != nil {
+		return "", err
+	}
+	filename := filepath.Join(p.Config.ProjectPath, artist, album+".m4b")
+
+	return filename, nil
+}
+
+func (p *M4bProject) ArtistAndBookTitle() (string, string, error) {
 	audioFiles, err := p.Tracks()
 	if err != nil {
-		return "", fmt.Errorf("could not load audio files: %w", err)
+		return "", "", fmt.Errorf("could not load audio files: %w", err)
 	}
 
 	if len(audioFiles) == 0 {
-		return "", errors.New("no audio files found")
+		return "", "", errors.New("no audio files found")
 	}
 
 	tags, _, err := p.getUpdatedMetadata()
 
 	if err != nil {
-		return "", fmt.Errorf("could not get metadata: %w", err)
+		return "", "", fmt.Errorf("could not get metadata: %w", err)
 	}
 
 	artist, exists := tags["artist"]
 	if !exists {
-		return "", errors.New("no artist found in metadata")
+		return "", "", errors.New("no artist found in metadata")
 	}
 
 	album, exists := tags["album"]
 	if !exists {
-		return "", errors.New("no album found in metadata")
+		return "", "", errors.New("no album found in metadata")
 	}
 
-	filename := filepath.Join(p.Config.ProjectPath, artist, album+".m4b")
-
-	return filename, nil
+	return artist, album, nil
 }
 
 func (p *M4bProject) getUpdatedMetadata() (map[string]string, []string, error) {

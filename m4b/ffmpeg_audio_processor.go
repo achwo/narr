@@ -73,14 +73,13 @@ func (p *FFmpegAudioProcessor) filelistFileContent(files []string) string {
 }
 
 func (p *FFmpegAudioProcessor) AddChapters(m4bFile string, chapters string) error {
-	err := p.createChaptersFile(m4bFile, chapters)
-	if err != nil {
+	if err := p.createChaptersFile(m4bFile, chapters); err != nil {
 		return fmt.Errorf("Could not create chapters file: %w", err)
 	}
 
 	cmd := p.Command.Create("mp4chaps", "--import", m4bFile)
 	var outBuf bytes.Buffer
-	err = cmd.Run(&outBuf, &outBuf)
+	err := cmd.Run(&outBuf, &outBuf)
 	if err != nil {
 		fmt.Println(outBuf.String())
 		return fmt.Errorf("could not import chapters: %w", err)
@@ -91,18 +90,63 @@ func (p *FFmpegAudioProcessor) AddChapters(m4bFile string, chapters string) erro
 }
 
 func (p *FFmpegAudioProcessor) createChaptersFile(m4bFile string, chapters string) error {
-	withoutExtension := strings.TrimSuffix(m4bFile, filepath.Ext(m4bFile))
-	chaptersFileName := withoutExtension + ".chapters.txt"
-	if err := os.MkdirAll(filepath.Dir(chaptersFileName), 0755); err != nil {
+	chaptersFile := p.ChangeFileExtension(m4bFile, ".chapters.txt")
+	if err := os.MkdirAll(filepath.Dir(chaptersFile), 0755); err != nil {
 		return err
 	}
-	return os.WriteFile(chaptersFileName, []byte(chapters), 0600)
+	return os.WriteFile(chaptersFile, []byte(chapters), 0600)
 }
 
 func (p *FFmpegAudioProcessor) AddCover(m4bFile string, coverFile string) error {
 	return nil
 }
 
-func (p *FFmpegAudioProcessor) AddMetadata(m4bFile string, metadata string) error {
+func (p *FFmpegAudioProcessor) AddMetadata(m4bFile string, metadata string, bookTitle string) error {
+	metadataFile, err := p.createMetadataFile(m4bFile, metadata)
+	if err != nil {
+		return fmt.Errorf("Could not create metadata file: %w", err)
+	}
+
+	tempFile := p.ChangeFileExtension(m4bFile, ".withMetadata.m4b")
+
+	cmd := p.Command.Create(
+		"ffmpeg",
+		"-i",
+		m4bFile,
+		"-i",
+		metadataFile,
+		"-map_metadata",
+		"1",
+		"-c",
+		"copy",
+		"-metadata",
+		"title="+bookTitle,
+		tempFile,
+	)
+	var outBuf bytes.Buffer
+	err = cmd.Run(&outBuf, &outBuf)
+	if err != nil {
+		fmt.Println(outBuf.String())
+		return fmt.Errorf("could not import chapters: %w", err)
+	}
+
+	err = os.Rename(tempFile, m4bFile)
+	if err != nil {
+		return fmt.Errorf("Could not rename m4b file: %w", err)
+	}
+
 	return nil
+}
+
+func (p *FFmpegAudioProcessor) createMetadataFile(m4bFile string, metadata string) (string, error) {
+	metadataFile := p.ChangeFileExtension(m4bFile, ".metadata")
+	if err := os.MkdirAll(filepath.Dir(metadataFile), 0755); err != nil {
+		return "", err
+	}
+	return metadataFile, os.WriteFile(metadataFile, []byte(metadata), 0600)
+}
+
+func (p *FFmpegAudioProcessor) ChangeFileExtension(file string, ext string) string {
+	withoutExt := strings.TrimSuffix(file, filepath.Ext(file))
+	return withoutExt + ext
 }
