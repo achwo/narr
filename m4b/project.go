@@ -126,7 +126,7 @@ func (p *M4bProject) ConvertToM4B() (string, error) {
 		return "", fmt.Errorf("could not get filename: %w", err)
 	}
 
-	_, err = p.AudioProcessor.Concat(m4aFiles, p.filelistFile(), p.Config.ProjectPath)
+	m4bFile, err = p.AudioProcessor.Concat(m4aFiles, p.filelistFile(), p.Config.ProjectPath)
 	if err != nil {
 		return "", fmt.Errorf("could not concat files: %w", err)
 	}

@@ -18,10 +18,7 @@ func TestFFmpegAudioProcessor_ToM4A(t *testing.T) {
 	output := "./output"
 
 	files, err := processor.ToM4A(inputFiles, output)
-
-	if err != nil {
-		t.Errorf("Convert failed: %v", err)
-	}
+	require.NoError(t, err)
 
 	assert.Equal(
 		t,
@@ -57,10 +54,7 @@ func TestFFmpegAudioProcessor_Concat(t *testing.T) {
 	defer os.Remove(filelistFile.Name())
 
 	result, err := processor.Concat(inputFiles, filelistFile.Name(), outputPath)
-
-	if err != nil {
-		t.Errorf("Concat failed: %v", err)
-	}
+	require.NoError(t, err)
 
 	expectedFilelistContent := "file 'filepath1.m4a'\nfile 'filepath2.m4a'\n"
 
@@ -73,6 +67,30 @@ func TestFFmpegAudioProcessor_Concat(t *testing.T) {
 	assert.Equal(
 		t,
 		[]string{"ffmpeg", "-f", "concat", "-safe", "0", "-i", filelistFile.Name(), "-c", "copy", "-vn", "output/concat.m4b"},
+		fakeCommand.CreatedCommands[0],
+	)
+}
+
+func TestFFmpegAudioProcessor_AddChapters(t *testing.T) {
+	fakeCommand := FakeCommand{}
+	processor := &FFmpegAudioProcessor{Command: &fakeCommand}
+	inputFile := "bla/filepath1.m4b"
+	chaptersContent := "chapters"
+	chaptersFile := "bla/filepath1.chapters.txt"
+	defer os.Remove(chaptersFile)
+
+	err := processor.AddChapters(inputFile, chaptersContent)
+	require.NoError(t, err)
+
+	actualContent, err := os.ReadFile(chaptersFile)
+	require.NoError(t, err)
+
+	require.Equal(t, chaptersContent, string(actualContent))
+
+	require.Len(t, fakeCommand.CreatedCommands, 1)
+	require.Equal(
+		t,
+		[]string{"mp4chaps", "--import", "bla/filepath1.m4b"},
 		fakeCommand.CreatedCommands[0],
 	)
 }

@@ -1,4 +1,7 @@
 # TODO
+- [ ] mehr tests
+- [ ] überall require assertions
+- [ ] table driven tests
 
 ## Use Case
 Input: ein haufen flacs
