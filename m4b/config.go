@@ -46,7 +46,11 @@ func (c *ProjectConfig) Validate() error {
 // FullAudioFilePath returns the absolute path to the audio file.
 // Returns an error if the absolute path cannot be determined.
 func (c *ProjectConfig) FullAudioFilePath() (string, error) {
-	audioFilePath, err := filepath.Abs(c.AudioFilePath)
+	if filepath.IsAbs(c.AudioFilePath) {
+		return c.AudioFilePath, nil
+	}
+
+	audioFilePath, err := filepath.Abs(filepath.Join(c.ProjectPath, c.AudioFilePath))
 	if err != nil {
 		return "", fmt.Errorf("could not get absolute path %s, %w", c.AudioFilePath, err)
 	}

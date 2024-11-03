@@ -126,7 +126,7 @@ var filenameCmd = &cobra.Command{
 
 		filename, err := project.Filename()
 		if err != nil {
-			return fmt.Errorf("could not get metadata: %w", err)
+			return fmt.Errorf("could not get filename: %w", err)
 		}
 
 		fmt.Println(filename)
@@ -151,7 +151,7 @@ var filesCmd = &cobra.Command{
 
 		tracks, err := project.Tracks()
 		if err != nil {
-			return fmt.Errorf("could not get metadata: %w", err)
+			return fmt.Errorf("could not get tracks: %w", err)
 		}
 
 		for _, track := range tracks {

@@ -62,10 +62,6 @@ func NewProject(
 		return nil, err
 	}
 
-	if config.ProjectPath == "" {
-		config.ProjectPath = "."
-	}
-
 	return &BookProject{
 		Config:            config,
 		AudioFileProvider: audioProvider,
@@ -154,7 +150,7 @@ func (p *BookProject) ConvertToM4B() (string, error) {
 	fmt.Println("Adding metadata to m4b")
 	metadata, err := p.Metadata()
 	if err != nil {
-		return "", fmt.Errorf("could not get metadata: %w", err)
+		return "", fmt.Errorf("could not get metadata for m4b: %w", err)
 	}
 
 	_, bookTitle, err := p.ArtistAndBookTitle()
@@ -377,7 +373,7 @@ func (p *BookProject) ArtistAndBookTitle() (string, string, error) {
 	tags, _, err := p.getUpdatedMetadata()
 
 	if err != nil {
-		return "", "", fmt.Errorf("could not get metadata: %w", err)
+		return "", "", fmt.Errorf("could not get metadata for artist and book title: %w", err)
 	}
 
 	artist, exists := tags["artist"]
