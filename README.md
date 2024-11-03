@@ -2,6 +2,7 @@
 - [ ] mehr tests
 - [ ] überall require assertions
 - [ ] table driven tests
+- [ ] speed up check commands
 
 ## Use Case
 Input: ein haufen flacs

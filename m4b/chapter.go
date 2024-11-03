@@ -25,7 +25,7 @@ func (c *Chapter) addFile(file File) {
 
 // ChapterMarker returns a formatted string containing chapter timing and title information
 // in the format used by common audiobook chapter markers
-func (c *Chapter) ChapterMarker() string {
+func (c *Chapter) ChapterMarker(chapterIndex int) string {
 	formatTime := func(s float64) string {
 		duration := time.Duration(s * float64(time.Second))
 
@@ -37,10 +37,9 @@ func (c *Chapter) ChapterMarker() string {
 	}
 
 	offsetFormatted := formatTime(c.offset())
-	chapterIndex := fmt.Sprintf("%02d", c.index)
 
 	return fmt.Sprintf(
-		"CHAPTER%s=%s\nCHAPTER%sNAME=%s",
+		"CHAPTER%d=%s\nCHAPTER%dNAME=%s",
 		chapterIndex,
 		offsetFormatted,
 		chapterIndex,

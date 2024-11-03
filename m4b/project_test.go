@@ -5,7 +5,7 @@ import (
 
 	"github.com/achwo/narr/m4b"
 	"github.com/achwo/narr/testutils"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestShowChapters(t *testing.T) {
@@ -15,11 +15,9 @@ func TestShowChapters(t *testing.T) {
 	}
 
 	chapters, err := project.Chapters()
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
+	require.NoError(t, err)
 
-	assert.Equal(t, "CHAPTER00=00:00:00.000\nCHAPTER00NAME=Chapter 1", chapters)
+	require.Equal(t, "CHAPTER0=00:00:00.000\nCHAPTER0NAME=Chapter 1\n\nCHAPTER1=01:23:20.000\nCHAPTER1NAME=Chapter 2", chapters)
 }
 
 func TestShowMetadata(t *testing.T) {
@@ -31,23 +29,19 @@ func TestShowMetadata(t *testing.T) {
 	}
 	project, err := setupProject()
 	project.Config.MetadataRules = append(project.Config.MetadataRules, metadataRule)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	metadata, err := project.Metadata()
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
+	require.NoError(t, err)
 
-	assert.Equal(
+	require.Equal(
 		t,
 		`;FFMETADATA1
-title=02 - Star dust
+title=01 - Star dust
 artist=Hans Wurst read by George Washington
 album=The Book
 track=1/16
-disc=2/10
+disc=1/10
 date=2002-09-16`,
 		metadata,
 	)
@@ -60,12 +54,9 @@ func TestShowFilename(t *testing.T) {
 	}
 
 	filename, err := project.Filename()
+	require.NoError(t, err)
 
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-
-	assert.Equal(t, "Hans Wurst read by George Washington/The Book.m4b", filename)
+	require.Equal(t, "Hans Wurst read by George Washington/The Book.m4b", filename)
 }
 
 func TestTracks(t *testing.T) {
@@ -82,7 +73,7 @@ func TestTracks(t *testing.T) {
 		Title:    "Chapter 1",
 		Duration: 5000,
 		Metadata: `;FFMETADATA1
-title=Chapter 02-02: Star dust
+title=Chapter 01-02: Star dust
 artist=Hans Wurst read by George Washington
 album=The Book
 track=3/16
@@ -94,7 +85,7 @@ date=2002-09-16`,
 		Title:    "Chapter 1",
 		Duration: 5000,
 		Metadata: `;FFMETADATA1
-title=Chapter 02-02: Star dust
+title=Chapter 01-02: Star dust
 artist=Hans Wurst read by George Washington
 album=The Book
 track=2/16
@@ -103,10 +94,10 @@ date=2002-09-16`,
 	}
 
 	data["file3.m4a"] = testutils.FileData{
-		Title:    "Chapter 1",
+		Title:    "Chapter 2",
 		Duration: 5000,
 		Metadata: `;FFMETADATA1
-title=Chapter 02-02: Star dust
+title=Chapter 02-01: Star dust
 artist=Hans Wurst read by George Washington
 album=The Book
 track=1/16
@@ -124,14 +115,11 @@ date=2002-09-16`,
 	}
 
 	files, err := project.Tracks()
+	require.NoError(t, err)
 
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-
-	assert.Equal(t, "file2.m4a", files[0].File)
-	assert.Equal(t, "file1.m4a", files[1].File)
-	assert.Equal(t, "file3.m4a", files[2].File)
+	require.Equal(t, "file2.m4a", files[0].File)
+	require.Equal(t, "file1.m4a", files[1].File)
+	require.Equal(t, "file3.m4a", files[2].File)
 
 }
 
@@ -146,22 +134,33 @@ func setupProject() (*m4b.BookProject, error) {
 		Title:    "Chapter 1",
 		Duration: 5000,
 		Metadata: `;FFMETADATA1
-title=Chapter 02-02: Star dust
+title=Chapter 01-02: Star dust
 artist=Hans Wurst read by George Washington
 album=The Book
 track=1/16
+disc=1/10
+date=2002-09-16`,
+	}
+	data["file2.m4a"] = testutils.FileData{
+		Title:    "Chapter 1",
+		Duration: 5000,
+		Metadata: `;FFMETADATA1
+title=Chapter 01-02: Star dust
+artist=Hans Wurst read by George Washington
+album=The Book
+track=2/16
 disc=2/10
 date=2002-09-16`,
 	}
 
 	data["file2.m4a"] = testutils.FileData{
-		Title:    "Chapter 1",
+		Title:    "Chapter 2",
 		Duration: 5000,
 		Metadata: `;FFMETADATA1
-title=Chapter 02-02: Star dust
+title=Chapter 02-02: Wurst
 artist=Hans Wurst read by George Washington
 album=The Book
-track=1/16
+track=3/16
 disc=2/10
 date=2002-09-16`,
 	}

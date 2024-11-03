@@ -297,8 +297,8 @@ func (p *BookProject) Chapters() (string, error) {
 		}
 
 		value, exists := chapters[chapterName]
-
 		newFile := File{Name: track.File, Duration: duration}
+
 		if exists {
 			value.addFile(newFile)
 		} else {
@@ -316,9 +316,9 @@ func (p *BookProject) Chapters() (string, error) {
 
 	markers := make([]string, 0, len(chapters))
 
-	for _, name := range chapterOrder {
+	for i, name := range chapterOrder {
 		chapter := chapters[name]
-		markers = append(markers, chapter.ChapterMarker())
+		markers = append(markers, chapter.ChapterMarker(i))
 	}
 
 	markersFileContent := strings.Join(markers, "\n\n")
