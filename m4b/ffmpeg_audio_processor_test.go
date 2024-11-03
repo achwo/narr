@@ -142,6 +142,67 @@ func TestFFmpegAudioProcessor_AddMetadata(t *testing.T) {
 	require.True(t, os.IsNotExist(err), "Output file should not exist")
 }
 
+func TestFFmpegAudioProcessor_ExtractCover(t *testing.T) {
+	fakeCommand := FakeCommand{}
+	processor := &FFmpegAudioProcessor{Command: &fakeCommand}
+	inputFile := "filepath1.m4a"
+
+	coverFile, err := processor.ExtractCover(inputFile)
+	require.NoError(t, err)
+
+	require.Equal(t, "cover.jpg", coverFile)
+
+	require.Len(t, fakeCommand.CreatedCommands, 1)
+	require.Equal(
+		t,
+		[]string{"ffmpeg", "-i", inputFile, "-an", "-vcodec", "copy", coverFile},
+		fakeCommand.CreatedCommands[0],
+	)
+	require.True(t, fakeCommand.Cmd.Executed)
+}
+
+func TestFFmpegAudioProcessor_AddCover(t *testing.T) {
+	fakeCommand := FakeCommand{}
+	processor := &FFmpegAudioProcessor{Command: &fakeCommand}
+	inputFile := "filepath1.m4b"
+	coverFile := "cover.jpg"
+	outputFile := "filepath1.withCover.m4b"
+	// create output file to check that it is deleted
+	os.WriteFile(outputFile, []byte{}, 0600)
+	t.Cleanup(func() {
+		_ = os.Remove(outputFile)
+	})
+
+	err := processor.AddCover(inputFile, coverFile)
+	require.NoError(t, err)
+
+	require.Len(t, fakeCommand.CreatedCommands, 1)
+	require.Equal(
+		t,
+		[]string{
+			"ffmpeg",
+			"-i",
+			inputFile,
+			"-i",
+			coverFile,
+			"-map",
+			"0",
+			"-map",
+			"1",
+			"-c",
+			"copy",
+			"-disposition:v",
+			"attached_pic",
+			outputFile,
+		},
+		fakeCommand.CreatedCommands[0],
+	)
+	require.True(t, fakeCommand.Cmd.Executed)
+
+	_, err = os.Stat(outputFile)
+	require.True(t, os.IsNotExist(err), "Output file should not exist")
+}
+
 type FakeCommand struct {
 	CreatedCommands [][]string
 	Cmd             *FakeCmd

@@ -76,6 +76,7 @@ type AudioProcessor interface {
 	Concat(m4aFiles []string, templateFilePath string, outputPath string) (string, error)
 	AddMetadata(m4bFile string, metadata string, bookTitle string) error
 	AddCover(m4bFile string, coverFile string) error
+	ExtractCover(m4aFile string) (string, error)
 	AddChapters(m4bFile string, chapters string) error
 }
 
@@ -95,6 +96,7 @@ type M4bProject struct {
 	AudioFileProvider AudioFileProvider
 	MetadataProvider  MetadataProvider
 	AudioProcessor    AudioProcessor
+	tracks            []Track
 }
 
 func (p *M4bProject) ConvertToM4B() (string, error) {
@@ -121,12 +123,7 @@ func (p *M4bProject) ConvertToM4B() (string, error) {
 	}
 
 	fmt.Println("Concating files")
-	m4bFile, err := p.Filename()
-	if err != nil {
-		return "", fmt.Errorf("could not get filename: %w", err)
-	}
-
-	m4bFile, err = p.AudioProcessor.Concat(m4aFiles, p.filelistFile(), p.Config.ProjectPath)
+	m4bFile, err := p.AudioProcessor.Concat(m4aFiles, p.filelistFile(), p.Config.ProjectPath)
 	if err != nil {
 		return "", fmt.Errorf("could not concat files: %w", err)
 	}
@@ -147,8 +144,13 @@ func (p *M4bProject) ConvertToM4B() (string, error) {
 		return "", fmt.Errorf("could not add metadata to %s: %w", m4bFile, err)
 	}
 
+	cover, err := p.Cover()
+	if err != nil {
+		return "", fmt.Errorf("could not get cover: %w", err)
+	}
+
 	fmt.Println("Adding cover to m4b")
-	err = p.AudioProcessor.AddCover(m4bFile, p.Config.CoverPath)
+	err = p.AudioProcessor.AddCover(m4bFile, cover)
 	if err != nil {
 		return "", fmt.Errorf("could not add cover to %s: %w", m4bFile, err)
 	}
@@ -164,10 +166,35 @@ func (p *M4bProject) ConvertToM4B() (string, error) {
 		return "", fmt.Errorf("could not add chapters to %s: %w", m4bFile, err)
 	}
 
+	// TODO: rename file
+	// finalFilename, err := p.Filename()
+	// if err != nil {
+	// 	return "", fmt.Errorf("could not get filename: %w", err)
+	// }
+
 	return m4bFile, nil
 }
 
+func (p *M4bProject) Cover() (string, error) {
+	coverFromConfig := p.Config.CoverPath
+
+	if _, err := os.Stat(coverFromConfig); !errors.Is(err, os.ErrNotExist) {
+		return coverFromConfig, nil
+	}
+
+	tracks, err := p.Tracks()
+	if err != nil {
+		return "", err
+	}
+	firstFile := tracks[0].File
+	return p.AudioProcessor.ExtractCover(firstFile)
+}
+
 func (p *M4bProject) Tracks() ([]Track, error) {
+	if p.tracks != nil {
+		return p.tracks, nil
+	}
+
 	fullpath, err := p.Config.FullAudioFilePath()
 	if err != nil {
 		return nil, err
@@ -210,7 +237,7 @@ func (p *M4bProject) Tracks() ([]Track, error) {
 
 		return strings.Compare(a.File, b.File)
 	})
-
+	p.tracks = tracks
 	return tracks, nil
 }
 
@@ -358,7 +385,7 @@ func (p *M4bProject) getUpdatedFileMetadata(file string) (map[string]string, []s
 func (p *M4bProject) m4aPath() (string, error) {
 	m4aPath := filepath.Join(p.Config.ProjectPath, "m4a")
 
-	if _, err := os.Stat(m4aPath); !os.IsNotExist(err) {
+	if _, err := os.Stat(m4aPath); !errors.Is(err, os.ErrNotExist) {
 		return "", fmt.Errorf("m4a directory already exists: %s", m4aPath)
 	}
 

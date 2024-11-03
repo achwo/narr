@@ -98,6 +98,36 @@ func (p *FFmpegAudioProcessor) createChaptersFile(m4bFile string, chapters strin
 }
 
 func (p *FFmpegAudioProcessor) AddCover(m4bFile string, coverFile string) error {
+	tempFile := p.ChangeFileExtension(m4bFile, ".withCover.m4b")
+
+	cmd := p.Command.Create(
+		"ffmpeg",
+		"-i",
+		m4bFile,
+		"-i",
+		coverFile,
+		"-map",
+		"0",
+		"-map",
+		"1",
+		"-c",
+		"copy",
+		"-disposition:v",
+		"attached_pic",
+		tempFile,
+	)
+	var outBuf bytes.Buffer
+	err := cmd.Run(&outBuf, &outBuf)
+	if err != nil {
+		fmt.Println(outBuf.String())
+		return fmt.Errorf("could not import chapters: %w", err)
+	}
+
+	err = os.Rename(tempFile, m4bFile)
+	if err != nil {
+		return fmt.Errorf("Could not rename m4b file: %w", err)
+	}
+
 	return nil
 }
 
@@ -136,6 +166,19 @@ func (p *FFmpegAudioProcessor) AddMetadata(m4bFile string, metadata string, book
 	}
 
 	return nil
+}
+
+func (p *FFmpegAudioProcessor) ExtractCover(m4aFile string) (string, error) {
+	cmd := p.Command.Create("ffmpeg", "-i", m4aFile, "-an", "-vcodec", "copy", "cover.jpg")
+
+	var outBuf bytes.Buffer
+	err := cmd.Run(&outBuf, &outBuf)
+	if err != nil {
+		fmt.Println(outBuf.String())
+		return "", fmt.Errorf("could not import chapters: %w", err)
+	}
+
+	return "cover.jpg", nil
 }
 
 func (p *FFmpegAudioProcessor) createMetadataFile(m4bFile string, metadata string) (string, error) {

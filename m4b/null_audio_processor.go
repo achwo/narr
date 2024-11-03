@@ -15,6 +15,10 @@ func (p *NullAudioProcessor) AddChapters(m4bFile string, chapters string) error 
 	return nil
 }
 
+func (p *NullAudioProcessor) ExtractCover(m4aFile string) (string, error) {
+	return "", nil
+}
+
 func (p *NullAudioProcessor) AddCover(m4bFile string, coverFile string) error {
 	return nil
 }
