@@ -340,7 +340,14 @@ func (p *BookProject) Metadata() (string, error) {
 	lines := []string{firstLine}
 
 	for _, tag := range tagOrder {
-		lines = append(lines, tag+"="+tags[tag])
+		switch tag {
+		case "track":
+			continue
+		case "disc":
+			continue
+		default:
+			lines = append(lines, tag+"="+tags[tag])
+		}
 	}
 
 	return strings.Join(lines, "\n"), nil

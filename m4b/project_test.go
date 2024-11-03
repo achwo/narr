@@ -40,8 +40,6 @@ func TestShowMetadata(t *testing.T) {
 title=01 - Star dust
 artist=Hans Wurst read by George Washington
 album=The Book
-track=1/16
-disc=1/10
 date=2002-09-16`,
 		metadata,
 	)
