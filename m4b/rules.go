@@ -8,6 +8,9 @@ import (
 	"github.com/achwo/narr/utils"
 )
 
+// MetadataRule defines a rule for modifying metadata tags in an M4B file.
+// Rules can be of different types like "regex", "delete", or "set" and operate
+// on specific metadata tags.
 type MetadataRule struct {
 	Type   string `yaml:"type"`
 	Tag    string `yaml:"tag,omitempty"`
@@ -16,6 +19,8 @@ type MetadataRule struct {
 	Format string `yaml:"format,omitempty"`
 }
 
+// Apply executes the rule on the provided tags map, modifying the tags according
+// to the rule's type and parameters. Returns an error if the rule application fails.
 func (r *MetadataRule) Apply(tags map[string]string) error {
 	value, exists := tags[r.Tag]
 
@@ -45,6 +50,8 @@ func (r *MetadataRule) Apply(tags map[string]string) error {
 	return nil
 }
 
+// Validate checks if the rule is properly configured with all required fields
+// based on its type. Returns an error if the configuration is invalid.
 func (r *MetadataRule) Validate() error {
 	if r.Tag == "" {
 		return errors.New("rule must have a tag")
@@ -74,11 +81,15 @@ func (r *MetadataRule) Validate() error {
 	return nil
 }
 
+// ChapterRule defines a rule for modifying chapter titles in an M4B file
+// using regex pattern matching and formatting.
 type ChapterRule struct {
 	Regex  string `yaml:"regex"`
 	Format string `yaml:"format"`
 }
 
+// Validate checks if the chapter rule has both required regex and format fields.
+// Returns an error if either field is missing.
 func (r *ChapterRule) Validate() error {
 	if r.Regex == "" || r.Format == "" {
 		return errors.New("regex rule requires both regex and format")
@@ -86,6 +97,8 @@ func (r *ChapterRule) Validate() error {
 	return nil
 }
 
+// Apply executes the chapter rule on the provided chapter title string.
+// Returns the modified chapter title and any error that occurred during processing.
 func (r *ChapterRule) Apply(chapter string) (string, error) {
 	regex, err := regexp.Compile(r.Regex)
 	if err != nil {

@@ -135,7 +135,7 @@ date=2002-09-16`,
 
 }
 
-func setupProject() (*m4b.M4bProject, error) {
+func setupProject() (*m4b.BookProject, error) {
 	fakeAudioProvider := &testutils.FakeAudioFileProvider{
 		Files: []string{"file1.m4a", "file2.m4a"},
 	}

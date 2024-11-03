@@ -6,6 +6,19 @@ import (
 	"strings"
 )
 
+// ApplyRegex applies a regular expression pattern to an input string and formats the captured groups
+// using the provided format string. The format string should contain %s placeholders that match
+// the number of capture groups in the regex pattern.
+//
+// Parameters:
+//   - input: The input string to apply the regex pattern to
+//   - regex: A compiled regular expression pattern with capture groups
+//   - format: A format string containing %s placeholders for each capture group
+//
+// Returns:
+//   - string: The formatted result using captured groups, or the original input if there's an error
+//   - error: An error if the input doesn't match the pattern or if the number of capture groups
+//     doesn't match the format string placeholders
 func ApplyRegex(input string, regex *regexp.Regexp, format string) (string, error) {
 	expectedMatchLen := strings.Count(format, "%s")
 

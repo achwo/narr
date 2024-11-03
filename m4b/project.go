@@ -14,12 +14,16 @@ import (
 
 const configFileName = "narr.yaml"
 
+// NewProjectFromPath creates a new BookProject from a configuration file at the given path.
+// It reads and parses the narr.yaml configuration file and initializes the project with the
+// provided audio file provider, metadata provider, and audio converter.
+// Returns an error if the configuration file cannot be read or parsed.
 func NewProjectFromPath(
 	path string,
 	audioProvider AudioFileProvider,
 	metadataProvider MetadataProvider,
 	audioConverter AudioProcessor,
-) (*M4bProject, error) {
+) (*BookProject, error) {
 	var fullpath string
 
 	if strings.HasSuffix(path, configFileName) {
@@ -44,12 +48,15 @@ func NewProjectFromPath(
 	return NewProject(config, audioProvider, metadataProvider, audioConverter)
 }
 
+// NewProject creates a new BookProject with the given configuration and providers.
+// It validates the configuration before creating the project.
+// Returns an error if the configuration is invalid.
 func NewProject(
 	config ProjectConfig,
 	audioProvider AudioFileProvider,
 	metadataProvider MetadataProvider,
 	audioConverter AudioProcessor,
-) (*M4bProject, error) {
+) (*BookProject, error) {
 	err := config.Validate()
 	if err != nil {
 		return nil, err
@@ -59,7 +66,7 @@ func NewProject(
 		config.ProjectPath = "."
 	}
 
-	return &M4bProject{
+	return &BookProject{
 		Config:            config,
 		AudioFileProvider: audioProvider,
 		MetadataProvider:  metadataProvider,
@@ -67,10 +74,13 @@ func NewProject(
 	}, nil
 }
 
+// AudioFileProvider defines the interface for providing audio files from a directory.
 type AudioFileProvider interface {
 	AudioFiles(fullPath string) ([]string, error)
 }
 
+// AudioProcessor defines the interface for processing audio files, including
+// conversion, concatenation, and metadata manipulation operations.
 type AudioProcessor interface {
 	ToM4A(files []string, outputPath string) ([]string, error)
 	Concat(m4aFiles []string, templateFilePath string, outputPath string) (string, error)
@@ -80,18 +90,23 @@ type AudioProcessor interface {
 	AddChapters(m4bFile string, chapters string) error
 }
 
+// MetadataProvider defines the interface for reading metadata from audio files.
 type MetadataProvider interface {
 	ReadTitleAndDuration(file string) (string, float64, error)
 	ReadMetadata(file string) (string, error)
 }
 
+// Project defines the interface for working with audiobook projects.
 type Project interface {
 	AudioFiles() ([]string, error)
 	ShowChapters() (string, error)
 	ShowMetadata() (string, error)
 }
 
-type M4bProject struct {
+// BookProject represents an audiobook project that can be converted to M4B format.
+// It contains configuration, providers for audio files and metadata, and an audio processor
+// for handling audio file conversions and manipulations.
+type BookProject struct {
 	Config            ProjectConfig
 	AudioFileProvider AudioFileProvider
 	MetadataProvider  MetadataProvider
@@ -100,7 +115,10 @@ type M4bProject struct {
 	workDir           string
 }
 
-func (p *M4bProject) ConvertToM4B() (string, error) {
+// ConvertToM4B processes all audio files in the project and creates a single M4B audiobook file.
+// It handles conversion to M4A, concatenation, and addition of metadata, cover art, and chapters.
+// Returns the path to the created M4B file and any error encountered during the process.
+func (p *BookProject) ConvertToM4B() (string, error) {
 	p.workDir = filepath.Join(p.Config.ProjectPath, "temp")
 	_ = os.Mkdir(p.workDir, 0755)
 	defer os.RemoveAll(p.workDir)
@@ -184,7 +202,10 @@ func (p *M4bProject) ConvertToM4B() (string, error) {
 	return m4bFile, nil
 }
 
-func (p *M4bProject) Cover() (string, error) {
+// Cover returns the path to the cover image for the audiobook.
+// It first checks for a cover specified in the configuration, then attempts to
+// extract a cover from the first audio file if no configuration cover exists.
+func (p *BookProject) Cover() (string, error) {
 	coverFromConfig := p.Config.CoverPath
 
 	if _, err := os.Stat(coverFromConfig); !errors.Is(err, os.ErrNotExist) {
@@ -199,7 +220,10 @@ func (p *M4bProject) Cover() (string, error) {
 	return p.AudioProcessor.ExtractCover(firstFile)
 }
 
-func (p *M4bProject) Tracks() ([]Track, error) {
+// Tracks returns a sorted list of all audio tracks in the project.
+// Tracks are sorted by disc number and track number, with filename as a fallback.
+// Results are cached after the first call.
+func (p *BookProject) Tracks() ([]Track, error) {
 	if p.tracks != nil {
 		return p.tracks, nil
 	}
@@ -250,7 +274,9 @@ func (p *M4bProject) Tracks() ([]Track, error) {
 	return tracks, nil
 }
 
-func (p *M4bProject) Chapters() (string, error) {
+// Chapters generates chapter markers for the audiobook based on the track metadata
+// and configured chapter rules. Returns the chapter markers in FFmpeg metadata format.
+func (p *BookProject) Chapters() (string, error) {
 	tracks, err := p.Tracks()
 	if err != nil {
 		return "", fmt.Errorf("could not load audio files: %w", err)
@@ -304,7 +330,10 @@ func (p *M4bProject) Chapters() (string, error) {
 	return markersFileContent, nil
 }
 
-func (p *M4bProject) Metadata() (string, error) {
+// Metadata returns the audiobook metadata in FFmpeg metadata format.
+// The metadata is derived from the first track and processed according to the
+// configured metadata rules.
+func (p *BookProject) Metadata() (string, error) {
 	tags, tagOrder, err := p.getUpdatedMetadata()
 	if err != nil {
 		return "", err
@@ -321,7 +350,9 @@ func (p *M4bProject) Metadata() (string, error) {
 	return strings.Join(lines, "\n"), nil
 }
 
-func (p *M4bProject) Filename() (string, error) {
+// Filename returns the output file name for the project.
+// It takes artist and book title from the first file as a basis.
+func (p *BookProject) Filename() (string, error) {
 	artist, album, err := p.ArtistAndBookTitle()
 	if err != nil {
 		return "", err
@@ -331,7 +362,9 @@ func (p *M4bProject) Filename() (string, error) {
 	return filename, nil
 }
 
-func (p *M4bProject) ArtistAndBookTitle() (string, string, error) {
+// ArtistAndBookTitle reads the metadata from the first track and returns the
+// artist and book title.
+func (p *BookProject) ArtistAndBookTitle() (string, string, error) {
 	audioFiles, err := p.Tracks()
 	if err != nil {
 		return "", "", fmt.Errorf("could not load audio files: %w", err)
@@ -360,7 +393,7 @@ func (p *M4bProject) ArtistAndBookTitle() (string, string, error) {
 	return artist, album, nil
 }
 
-func (p *M4bProject) getUpdatedMetadata() (map[string]string, []string, error) {
+func (p *BookProject) getUpdatedMetadata() (map[string]string, []string, error) {
 	audioFiles, err := p.Tracks()
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not load audio files: %w", err)
@@ -373,7 +406,7 @@ func (p *M4bProject) getUpdatedMetadata() (map[string]string, []string, error) {
 	return audioFiles[0].Metadata, audioFiles[0].TagOrder, nil
 }
 
-func (p *M4bProject) getUpdatedFileMetadata(file string) (map[string]string, []string, error) {
+func (p *BookProject) getUpdatedFileMetadata(file string) (map[string]string, []string, error) {
 	metadata, err := p.MetadataProvider.ReadMetadata(file)
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not read metadata: %w", err)
@@ -391,7 +424,7 @@ func (p *M4bProject) getUpdatedFileMetadata(file string) (map[string]string, []s
 	return tags, tagOrder, nil
 }
 
-func (p *M4bProject) m4aPath() (string, error) {
+func (p *BookProject) m4aPath() (string, error) {
 	m4aPath := filepath.Join(p.workDir, "m4a")
 
 	if _, err := os.Stat(m4aPath); !errors.Is(err, os.ErrNotExist) {
@@ -405,11 +438,11 @@ func (p *M4bProject) m4aPath() (string, error) {
 	return m4aPath, nil
 }
 
-func (p *M4bProject) filelistFile() string {
+func (p *BookProject) filelistFile() string {
 	return filepath.Join(p.workDir, "filelist.txt")
 }
 
-func (p *M4bProject) getMetadataTags(metadata string) (map[string]string, []string) {
+func (p *BookProject) getMetadataTags(metadata string) (map[string]string, []string) {
 	var tags = make(map[string]string)
 
 	lines := strings.Split(metadata, "\n")[1:]

@@ -9,10 +9,14 @@ import (
 	"strings"
 )
 
+// FFmpegAudioProcessor handles audio file processing operations using FFmpeg
 type FFmpegAudioProcessor struct {
 	Command Command
 }
 
+// ToM4A converts audio files to M4A format using FFmpeg
+// It takes a slice of input file paths and an output directory path
+// Returns a slice of converted file paths or an error
 func (p *FFmpegAudioProcessor) ToM4A(files []string, outputPath string) ([]string, error) {
 	outputFiles := make([]string, 0, len(files))
 	for _, file := range files {
@@ -33,6 +37,9 @@ func (p *FFmpegAudioProcessor) ToM4A(files []string, outputPath string) ([]strin
 	return outputFiles, nil
 }
 
+// Concat concatenates multiple audio files into a single M4B file
+// It takes input files, a temporary filelist path, and an output directory
+// Returns the path to the concatenated file or an error
 func (p *FFmpegAudioProcessor) Concat(files []string, filelistFile string, outputPath string) (string, error) {
 	err := os.WriteFile(filelistFile, []byte(p.filelistFileContent(files)), 0600)
 	if err != nil {
@@ -72,9 +79,11 @@ func (p *FFmpegAudioProcessor) filelistFileContent(files []string) string {
 	return sb.String()
 }
 
+// AddChapters adds chapter markers to an M4B file using mp4chaps
+// It takes the M4B file path and a string containing chapter information
 func (p *FFmpegAudioProcessor) AddChapters(m4bFile string, chapters string) error {
 	if err := p.createChaptersFile(m4bFile, chapters); err != nil {
-		return fmt.Errorf("Could not create chapters file: %w", err)
+		return fmt.Errorf("could not create chapters file: %w", err)
 	}
 
 	cmd := p.Command.Create("mp4chaps", "--import", m4bFile)
@@ -97,6 +106,8 @@ func (p *FFmpegAudioProcessor) createChaptersFile(m4bFile string, chapters strin
 	return os.WriteFile(chaptersFile, []byte(chapters), 0600)
 }
 
+// AddCover adds cover artwork to an M4B file
+// It takes the M4B file path and the cover image file path
 func (p *FFmpegAudioProcessor) AddCover(m4bFile string, coverFile string) error {
 	tempFile := p.ChangeFileExtension(m4bFile, ".withCover.m4b")
 
@@ -125,16 +136,18 @@ func (p *FFmpegAudioProcessor) AddCover(m4bFile string, coverFile string) error 
 
 	err = os.Rename(tempFile, m4bFile)
 	if err != nil {
-		return fmt.Errorf("Could not rename m4b file: %w", err)
+		return fmt.Errorf("could not rename m4b file: %w", err)
 	}
 
 	return nil
 }
 
+// AddMetadata adds metadata tags to an M4B file
+// It takes the M4B file path, metadata content, and book title
 func (p *FFmpegAudioProcessor) AddMetadata(m4bFile string, metadata string, bookTitle string) error {
 	metadataFile, err := p.createMetadataFile(m4bFile, metadata)
 	if err != nil {
-		return fmt.Errorf("Could not create metadata file: %w", err)
+		return fmt.Errorf("could not create metadata file: %w", err)
 	}
 
 	tempFile := p.ChangeFileExtension(m4bFile, ".withMetadata.m4b")
@@ -162,12 +175,14 @@ func (p *FFmpegAudioProcessor) AddMetadata(m4bFile string, metadata string, book
 
 	err = os.Rename(tempFile, m4bFile)
 	if err != nil {
-		return fmt.Errorf("Could not rename m4b file: %w", err)
+		return fmt.Errorf("could not rename m4b file: %w", err)
 	}
 
 	return nil
 }
 
+// ExtractCover extracts cover artwork from an M4A file
+// It takes the M4A file path and returns the path to the extracted cover image
 func (p *FFmpegAudioProcessor) ExtractCover(m4aFile string) (string, error) {
 	cmd := p.Command.Create("ffmpeg", "-i", m4aFile, "-an", "-vcodec", "copy", "cover.jpg")
 
@@ -189,6 +204,8 @@ func (p *FFmpegAudioProcessor) createMetadataFile(m4bFile string, metadata strin
 	return metadataFile, os.WriteFile(metadataFile, []byte(metadata), 0600)
 }
 
+// ChangeFileExtension changes the extension of a file path
+// It takes the original file path and new extension, returns the modified path
 func (p *FFmpegAudioProcessor) ChangeFileExtension(file string, ext string) string {
 	withoutExt := strings.TrimSuffix(file, filepath.Ext(file))
 	return withoutExt + ext

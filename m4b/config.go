@@ -1,3 +1,5 @@
+// Package m4b provides functionality for handling M4B audiobook files,
+// including configuration, metadata management, and chapter handling.
 package m4b
 
 import (
@@ -6,6 +8,8 @@ import (
 	"path/filepath"
 )
 
+// ProjectConfig represents the configuration for an M4B audiobook project,
+// including paths to required files and rules for metadata and chapters.
 type ProjectConfig struct {
 	AudioFilePath string         `yaml:"audioFilePath"`
 	CoverPath     string         `yaml:"coverPath"`
@@ -15,6 +19,8 @@ type ProjectConfig struct {
 	ProjectPath   string         `yaml:"projectPath,omitempty"`
 }
 
+// Validate checks if the ProjectConfig is valid by ensuring required fields
+// are present and all rules are valid. Returns an error if validation fails.
 func (c *ProjectConfig) Validate() error {
 	if c.AudioFilePath == "" {
 		return errors.New("audioFilePath must be a valid path")
@@ -37,6 +43,8 @@ func (c *ProjectConfig) Validate() error {
 	return nil
 }
 
+// FullAudioFilePath returns the absolute path to the audio file.
+// Returns an error if the absolute path cannot be determined.
 func (c *ProjectConfig) FullAudioFilePath() (string, error) {
 	audioFilePath, err := filepath.Abs(c.AudioFilePath)
 	if err != nil {

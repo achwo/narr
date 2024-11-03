@@ -5,11 +5,13 @@ import (
 	"time"
 )
 
+// File represents an audio file with its name and duration
 type File struct {
 	Name     string
 	Duration float64
 }
 
+// Chapter represents a section in an audiobook with timing information and contained files
 type Chapter struct {
 	title           string
 	previousChapter *Chapter
@@ -21,6 +23,8 @@ func (c *Chapter) addFile(file File) {
 	c.files = append(c.files, file)
 }
 
+// ChapterMarker returns a formatted string containing chapter timing and title information
+// in the format used by common audiobook chapter markers
 func (c *Chapter) ChapterMarker() string {
 	formatTime := func(s float64) string {
 		duration := time.Duration(s * float64(time.Second))

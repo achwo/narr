@@ -1,3 +1,4 @@
+// Package utils provides utility functions for file operations and audio file handling
 package utils
 
 import (
@@ -8,12 +9,16 @@ import (
 	"path/filepath"
 )
 
+// OSAudioFileProvider implements audio file discovery functionality using the OS filesystem
 type OSAudioFileProvider struct{}
 
+// AudioFiles returns a list of M4A audio files found at the given path
 func (p *OSAudioFileProvider) AudioFiles(fullPath string) ([]string, error) {
 	return GetFilesByExtension(fullPath, ".m4a")
 }
 
+// GetValidFilePathFromArgs retrieves and validates a file path from command line arguments.
+// It returns an error if the path at the given index doesn't exist or is a directory.
 func GetValidFilePathFromArgs(args []string, index int) (string, error) {
 	path, err := GetValidFullpathFromArgs(args, index)
 	if err != nil {
@@ -32,6 +37,8 @@ func GetValidFilePathFromArgs(args []string, index int) (string, error) {
 	return path, nil
 }
 
+// GetValidDirPathFromArgs retrieves and validates a directory path from command line arguments.
+// It returns an error if the path at the given index doesn't exist or is not a directory.
 func GetValidDirPathFromArgs(args []string, index int) (string, error) {
 	path, err := GetValidFullpathFromArgs(args, index)
 	if err != nil {
@@ -50,6 +57,8 @@ func GetValidDirPathFromArgs(args []string, index int) (string, error) {
 	return path, nil
 }
 
+// GetValidFullpathFromArgs retrieves a path from command line arguments and converts it to an absolute path.
+// It returns an error if the index is out of bounds or the path conversion fails.
 func GetValidFullpathFromArgs(args []string, index int) (string, error) {
 	if len(args) < index+1 {
 		return "", errors.New("you must specify a path")
@@ -64,6 +73,8 @@ func GetValidFullpathFromArgs(args []string, index int) (string, error) {
 	return fullpath, nil
 }
 
+// GetFilesByExtension walks through a directory tree and returns all files with the specified extension.
+// It returns an error if there are any issues accessing the filesystem during the walk.
 func GetFilesByExtension(fullpath string, extension string) ([]string, error) {
 	var m4bFiles []string
 

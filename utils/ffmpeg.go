@@ -10,21 +10,27 @@ import (
 	"strconv"
 )
 
+// TagWithValue represents a metadata tag and its associated value
 type TagWithValue struct {
-	Tag   string
-	Value string
+	Tag   string // The metadata tag name
+	Value string // The value associated with the tag
 }
 
+// Prefix returns the tag name with an equals sign appended
 func (t TagWithValue) Prefix() string {
 	return fmt.Sprintf("%s=", t.Tag)
 }
 
+// String returns the tag and value formatted as "tag=value"
 func (t TagWithValue) String() string {
 	return fmt.Sprintf("%s=%s", t.Tag, t.Value)
 }
 
+// FFmpegMetadataProvider handles reading and writing metadata using FFmpeg
 type FFmpegMetadataProvider struct{}
 
+// ReadMetadata extracts metadata from a media file at the given path
+// Returns the metadata as a string in FFmpeg metadata format
 func (m *FFmpegMetadataProvider) ReadMetadata(path string) (string, error) {
 	extractCmd := exec.Command("ffmpeg", "-i", path, "-f", "ffmetadata", "-")
 
@@ -39,6 +45,9 @@ func (m *FFmpegMetadataProvider) ReadMetadata(path string) (string, error) {
 }
 
 // WriteMetadata updates the metadata in the file
+// WriteMetadata updates the metadata in the media file
+// Creates a temporary file during the process and replaces the original file
+// If verbose is true, prints FFmpeg command and output
 func (m *FFmpegMetadataProvider) WriteMetadata(file string, metadata string, verbose bool) error {
 	tmpFile := file + ".tmp" + filepath.Ext(file)
 
@@ -56,6 +65,8 @@ func (m *FFmpegMetadataProvider) WriteMetadata(file string, metadata string, ver
 }
 
 // WriteMetadataO is like WriteMetadata with explicit output file
+// WriteMetadataO writes metadata to a new output file instead of modifying the input file
+// If verbose is true, prints FFmpeg command and output
 func (m *FFmpegMetadataProvider) WriteMetadataO(inputFile string, outputFile string, metadata string, verbose bool) error {
 	writeCmd := exec.Command("ffmpeg", "-i", inputFile, "-f", "ffmetadata", "-i", "-", "-map_metadata", "1", "-c", "copy", outputFile)
 
@@ -81,6 +92,8 @@ func (m *FFmpegMetadataProvider) WriteMetadataO(inputFile string, outputFile str
 	return nil
 }
 
+// ReadTitleAndDuration extracts the title and duration from a media file
+// Returns the title string and duration in seconds
 func (m *FFmpegMetadataProvider) ReadTitleAndDuration(file string) (string, float64, error) {
 	dataCmd := exec.Command(
 		"ffprobe",

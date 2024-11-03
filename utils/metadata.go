@@ -5,6 +5,7 @@ import (
 	"strings"
 )
 
+// GetMetadataTagValues returns metadata tag values from a string
 // Deprecated: Use Project#GetMetadataTags instead
 func GetMetadataTagValues(metadata string, tags []string) []TagWithValue {
 	var tagValues []TagWithValue
@@ -73,8 +74,12 @@ func UpdateMetadataTags(
 	return metadata, affectedLines
 }
 
+// Diff represents a difference between two metadata values
 type Diff struct {
-	Tag    string
+	// Tag represents the metadata tag name that was modified
+	Tag string
+	// Before contains the original value before modification
 	Before string
-	After  string
+	// After contains the new value after modification
+	After string
 }
