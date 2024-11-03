@@ -97,9 +97,14 @@ type M4bProject struct {
 	MetadataProvider  MetadataProvider
 	AudioProcessor    AudioProcessor
 	tracks            []Track
+	workDir           string
 }
 
 func (p *M4bProject) ConvertToM4B() (string, error) {
+	p.workDir = filepath.Join(p.Config.ProjectPath, "temp")
+	_ = os.Mkdir(p.workDir, 0755)
+	defer os.RemoveAll(p.workDir)
+
 	tracks, err := p.Tracks()
 	if err != nil {
 		return "", fmt.Errorf("could not load audio files: %w", err)
@@ -123,7 +128,7 @@ func (p *M4bProject) ConvertToM4B() (string, error) {
 	}
 
 	fmt.Println("Concating files")
-	m4bFile, err := p.AudioProcessor.Concat(m4aFiles, p.filelistFile(), p.Config.ProjectPath)
+	m4bFile, err := p.AudioProcessor.Concat(m4aFiles, p.filelistFile(), p.workDir)
 	if err != nil {
 		return "", fmt.Errorf("could not concat files: %w", err)
 	}
@@ -139,8 +144,7 @@ func (p *M4bProject) ConvertToM4B() (string, error) {
 		return "", fmt.Errorf("could not read book title: %w", err)
 	}
 
-	err = p.AudioProcessor.AddMetadata(m4bFile, metadata, bookTitle)
-	if err != nil {
+	if err = p.AudioProcessor.AddMetadata(m4bFile, metadata, bookTitle); err != nil {
 		return "", fmt.Errorf("could not add metadata to %s: %w", m4bFile, err)
 	}
 
@@ -150,8 +154,7 @@ func (p *M4bProject) ConvertToM4B() (string, error) {
 	}
 
 	fmt.Println("Adding cover to m4b")
-	err = p.AudioProcessor.AddCover(m4bFile, cover)
-	if err != nil {
+	if err = p.AudioProcessor.AddCover(m4bFile, cover); err != nil {
 		return "", fmt.Errorf("could not add cover to %s: %w", m4bFile, err)
 	}
 
@@ -161,16 +164,22 @@ func (p *M4bProject) ConvertToM4B() (string, error) {
 		return "", fmt.Errorf("could not get chapters: %w", err)
 	}
 
-	err = p.AudioProcessor.AddChapters(m4bFile, chapters)
-	if err != nil {
+	if err = p.AudioProcessor.AddChapters(m4bFile, chapters); err != nil {
 		return "", fmt.Errorf("could not add chapters to %s: %w", m4bFile, err)
 	}
 
-	// TODO: rename file
-	// finalFilename, err := p.Filename()
-	// if err != nil {
-	// 	return "", fmt.Errorf("could not get filename: %w", err)
-	// }
+	finalFilename, err := p.Filename()
+	if err != nil {
+		return "", fmt.Errorf("could not get filename: %w", err)
+	}
+
+	if err = os.MkdirAll(filepath.Dir(finalFilename), 0755); err != nil {
+		return "", fmt.Errorf("could not create target dir: %w", err)
+	}
+
+	if err = os.Rename(m4bFile, finalFilename); err != nil {
+		return "", fmt.Errorf("could not rename file: %w", err)
+	}
 
 	return m4bFile, nil
 }
@@ -383,7 +392,7 @@ func (p *M4bProject) getUpdatedFileMetadata(file string) (map[string]string, []s
 }
 
 func (p *M4bProject) m4aPath() (string, error) {
-	m4aPath := filepath.Join(p.Config.ProjectPath, "m4a")
+	m4aPath := filepath.Join(p.workDir, "m4a")
 
 	if _, err := os.Stat(m4aPath); !errors.Is(err, os.ErrNotExist) {
 		return "", fmt.Errorf("m4a directory already exists: %s", m4aPath)
@@ -397,7 +406,7 @@ func (p *M4bProject) m4aPath() (string, error) {
 }
 
 func (p *M4bProject) filelistFile() string {
-	return filepath.Join(p.Config.ProjectPath, "filelist.txt")
+	return filepath.Join(p.workDir, "filelist.txt")
 }
 
 func (p *M4bProject) getMetadataTags(metadata string) (map[string]string, []string) {

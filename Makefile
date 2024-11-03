@@ -44,10 +44,7 @@ clean:
 	go clean
 	rm -f $(BINARY_NAME)
 	rm -f demo/*.m4b
-	rm -f demo/filelist.txt
-	rm -rf demo/m4a
-	rm -f demo/*.chapters.txt
-	rm -f demo/*.metadata
+	rm -f demo/temp
 
 # Run the Go project (shortcut)
 .PHONY: dev
