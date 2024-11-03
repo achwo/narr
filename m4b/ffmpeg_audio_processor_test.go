@@ -99,6 +99,7 @@ func TestFFmpegAudioProcessor_AddMetadata(t *testing.T) {
 	fakeCommand := FakeCommand{}
 	processor := &FFmpegAudioProcessor{Command: &fakeCommand}
 	inputFile := "filepath1.m4b"
+	defer os.Remove(inputFile)
 	metadataContent := "metadata"
 	bookTitle := "booktitle"
 	metadataFile := "filepath1.metadata"
@@ -165,6 +166,7 @@ func TestFFmpegAudioProcessor_AddCover(t *testing.T) {
 	fakeCommand := FakeCommand{}
 	processor := &FFmpegAudioProcessor{Command: &fakeCommand}
 	inputFile := "filepath1.m4b"
+	defer os.Remove(inputFile)
 	coverFile := "cover.jpg"
 	outputFile := "filepath1.withCover.m4b"
 	// create output file to check that it is deleted
