@@ -82,7 +82,7 @@ type AudioProcessor interface {
 	Concat(m4aFiles []string, templateFilePath string, outputPath string) (string, error)
 	AddMetadata(m4bFile string, metadata string, bookTitle string) error
 	AddCover(m4bFile string, coverFile string) error
-	ExtractCover(m4aFile string) (string, error)
+	ExtractCover(m4aFile string, workDir string) (string, error)
 	AddChapters(m4bFile string, chapters string) error
 }
 
@@ -195,7 +195,7 @@ func (p *BookProject) ConvertToM4B() (string, error) {
 		return "", fmt.Errorf("could not rename file: %w", err)
 	}
 
-	return m4bFile, nil
+	return finalFilename, nil
 }
 
 // Cover returns the path to the cover image for the audiobook.
@@ -203,8 +203,11 @@ func (p *BookProject) ConvertToM4B() (string, error) {
 // extract a cover from the first audio file if no configuration cover exists.
 func (p *BookProject) Cover() (string, error) {
 	coverFromConfig := p.Config.CoverPath
+	if !filepath.IsAbs(coverFromConfig) {
+		coverFromConfig = filepath.Join(p.Config.ProjectPath, coverFromConfig)
+	}
 
-	if _, err := os.Stat(coverFromConfig); !errors.Is(err, os.ErrNotExist) {
+	if info, err := os.Stat(coverFromConfig); !errors.Is(err, os.ErrNotExist) && !info.IsDir() {
 		return coverFromConfig, nil
 	}
 
@@ -213,7 +216,7 @@ func (p *BookProject) Cover() (string, error) {
 		return "", err
 	}
 	firstFile := tracks[0].File
-	return p.AudioProcessor.ExtractCover(firstFile)
+	return p.AudioProcessor.ExtractCover(firstFile, p.workDir)
 }
 
 // Tracks returns a sorted list of all audio tracks in the project.

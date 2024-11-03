@@ -24,7 +24,7 @@ func (p *NullAudioProcessor) AddChapters(m4bFile string, chapters string) error 
 }
 
 // ExtractCover is a no-op implementation that returns nil values.
-func (p *NullAudioProcessor) ExtractCover(m4aFile string) (string, error) {
+func (p *NullAudioProcessor) ExtractCover(m4aFile string, workDir string) (string, error) {
 	return "", nil
 }
 

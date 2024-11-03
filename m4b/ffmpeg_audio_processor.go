@@ -131,7 +131,7 @@ func (p *FFmpegAudioProcessor) AddCover(m4bFile string, coverFile string) error 
 	err := cmd.Run(&outBuf, &outBuf)
 	if err != nil {
 		fmt.Println(outBuf.String())
-		return fmt.Errorf("could not import chapters: %w", err)
+		return fmt.Errorf("could not add cover: %w", err)
 	}
 
 	err = os.Rename(tempFile, m4bFile)
@@ -170,7 +170,7 @@ func (p *FFmpegAudioProcessor) AddMetadata(m4bFile string, metadata string, book
 	err = cmd.Run(&outBuf, &outBuf)
 	if err != nil {
 		fmt.Println(outBuf.String())
-		return fmt.Errorf("could not import chapters: %w", err)
+		return fmt.Errorf("could not add metadata: %w", err)
 	}
 
 	err = os.Rename(tempFile, m4bFile)
@@ -183,17 +183,18 @@ func (p *FFmpegAudioProcessor) AddMetadata(m4bFile string, metadata string, book
 
 // ExtractCover extracts cover artwork from an M4A file
 // It takes the M4A file path and returns the path to the extracted cover image
-func (p *FFmpegAudioProcessor) ExtractCover(m4aFile string) (string, error) {
-	cmd := p.Command.Create("ffmpeg", "-i", m4aFile, "-an", "-vcodec", "copy", "cover.jpg")
+func (p *FFmpegAudioProcessor) ExtractCover(m4aFile string, workDir string) (string, error) {
+	coverFile := filepath.Join(workDir, "cover.jpg")
+	cmd := p.Command.Create("ffmpeg", "-i", m4aFile, "-an", "-vcodec", "copy", coverFile)
 
 	var outBuf bytes.Buffer
 	err := cmd.Run(&outBuf, &outBuf)
 	if err != nil {
 		fmt.Println(outBuf.String())
-		return "", fmt.Errorf("could not import chapters: %w", err)
+		return "", fmt.Errorf("could not extract cover: %w", err)
 	}
 
-	return "cover.jpg", nil
+	return coverFile, nil
 }
 
 func (p *FFmpegAudioProcessor) createMetadataFile(m4bFile string, metadata string) (string, error) {

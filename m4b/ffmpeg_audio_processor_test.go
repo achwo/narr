@@ -148,7 +148,7 @@ func TestFFmpegAudioProcessor_ExtractCover(t *testing.T) {
 	processor := &FFmpegAudioProcessor{Command: &fakeCommand}
 	inputFile := "filepath1.m4a"
 
-	coverFile, err := processor.ExtractCover(inputFile)
+	coverFile, err := processor.ExtractCover(inputFile, ".")
 	require.NoError(t, err)
 
 	require.Equal(t, "cover.jpg", coverFile)
