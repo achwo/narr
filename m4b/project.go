@@ -15,7 +15,8 @@ import (
 
 const configFileName = "narr.yaml"
 
-func NewRecursiveProjectsFromPath(path string,
+func NewRecursiveProjectsFromPath(
+	path string,
 	audioProvider AudioFileProvider,
 	metadataProvider MetadataProvider,
 	audioConverter AudioProcessor,
@@ -32,6 +33,53 @@ func NewRecursiveProjectsFromPath(path string,
 		if err != nil {
 			return nil, fmt.Errorf("could not create project for path '%s': %w", config, err)
 		}
+		projects = append(projects, project)
+	}
+
+	return projects, nil
+}
+
+func NewMultiProjectsFromPath(
+	path string,
+	audioProvider AudioFileProvider,
+	metadataProvider MetadataProvider,
+	audioConverter AudioProcessor,
+) ([]*Project, error) {
+	var fullpath string
+
+	if strings.HasSuffix(path, configFileName) {
+		fullpath = path
+	} else {
+		fullpath = filepath.Join(path, configFileName)
+	}
+
+	baseDir := filepath.Dir(fullpath)
+
+	projectDirEntries, err := os.ReadDir(baseDir)
+	if err != nil {
+		return nil, fmt.Errorf("could not get multi project directories: %w", err)
+	}
+
+	var projects []*Project
+
+	config, err := readConfig(fullpath)
+	if err != nil {
+		return nil, fmt.Errorf("could not read config file %s: %w", fullpath, err)
+	}
+
+	for _, dirEntry := range projectDirEntries {
+		if !dirEntry.IsDir() {
+			continue
+		}
+
+		projectConfig := *config
+		projectConfig.ProjectPath = filepath.Join(baseDir, dirEntry.Name())
+
+		project, err := NewProject(projectConfig, audioProvider, metadataProvider, audioConverter)
+		if err != nil {
+			return nil, fmt.Errorf("could not create project for path '%s': %w", dirEntry, err)
+		}
+
 		projects = append(projects, project)
 	}
 
@@ -56,6 +104,17 @@ func NewProjectFromPath(
 		fullpath = filepath.Join(path, configFileName)
 	}
 
+	config, err := readConfig(path)
+	if err != nil {
+		return nil, err
+	}
+
+	config.ProjectPath = filepath.Dir(fullpath)
+
+	return NewProject(*config, audioProvider, metadataProvider, audioConverter)
+}
+
+func readConfig(fullpath string) (*ProjectConfig, error) {
 	bytes, err := os.ReadFile(fullpath)
 	if err != nil {
 		return nil, fmt.Errorf("could not read file %s: %w", fullpath, err)
@@ -67,9 +126,7 @@ func NewProjectFromPath(
 		return nil, fmt.Errorf("could not unmarshal file %s: %w", fullpath, err)
 	}
 
-	config.ProjectPath = filepath.Dir(fullpath)
-
-	return NewProject(config, audioProvider, metadataProvider, audioConverter)
+	return &config, nil
 }
 
 // NewProject creates a new Project with the given configuration and providers.

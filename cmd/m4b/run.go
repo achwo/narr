@@ -1,6 +1,7 @@
 package m4b
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/achwo/narr/m4b"
@@ -13,6 +14,10 @@ var runCmd = &cobra.Command{
 	Short: "Convert to m4b",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		recursive, _ := cmd.Flags().GetBool("recursive")
+		multi, _ := cmd.Flags().GetBool("multi")
+		if recursive && multi {
+			return errors.New("cannot run both recursive and multi at the same time")
+		}
 
 		path, err := utils.GetValidFullpathFromArgs(args, 0)
 		if err != nil {
@@ -22,6 +27,8 @@ var runCmd = &cobra.Command{
 		var projects []*m4b.Project
 		if recursive {
 			projects, err = m4b.NewRecursiveProjectsFromPath(path, audioFileProvider, metadataProvider, audioConverter)
+		} else if multi {
+			projects, err = m4b.NewMultiProjectsFromPath(path, audioFileProvider, metadataProvider, audioConverter)
 		} else {
 			var project *m4b.Project
 			project, err = m4b.NewProjectFromPath(path, audioFileProvider, metadataProvider, audioConverter)
@@ -53,5 +60,6 @@ var runCmd = &cobra.Command{
 
 func init() {
 	M4bCmd.AddCommand(runCmd)
-	runCmd.Flags().BoolP("recursive", "r", false, "Search for projects in immediate child dirs and run them all")
+	runCmd.Flags().BoolP("recursive", "r", false, "Search for projects in child dirs recursively and run them all")
+	runCmd.Flags().BoolP("multi", "m", false, "Use provided config for all immediate child dirs and run them all")
 }
