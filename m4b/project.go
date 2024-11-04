@@ -108,8 +108,11 @@ type Project struct {
 // It handles conversion to M4A, concatenation, and addition of metadata, cover art, and chapters.
 // Returns the path to the created M4B file and any error encountered during the process.
 func (p *Project) ConvertToM4B() (string, error) {
-	p.workDir = filepath.Join(p.Config.ProjectPath, "temp")
-	_ = os.Mkdir(p.workDir, 0755)
+	if workDir, err := os.MkdirTemp("", "convert"); err == nil {
+		p.workDir = workDir
+	} else {
+		return "", fmt.Errorf("could not create work dir: %w", err)
+	}
 	defer os.RemoveAll(p.workDir)
 
 	tracks, err := p.Tracks()
