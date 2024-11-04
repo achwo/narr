@@ -9,10 +9,34 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/achwo/narr/utils"
 	"gopkg.in/yaml.v3"
 )
 
 const configFileName = "narr.yaml"
+
+func NewRecursiveProjectsFromPath(path string,
+	audioProvider AudioFileProvider,
+	metadataProvider MetadataProvider,
+	audioConverter AudioProcessor,
+) ([]*Project, error) {
+	projectConfigs, err := utils.GetAllFilesByName(path, "narr.yaml")
+	if err != nil {
+		return nil, fmt.Errorf("could not get project directories: %w", err)
+	}
+
+	var projects []*Project
+
+	for _, config := range projectConfigs {
+		project, err := NewProjectFromPath(config, audioProvider, metadataProvider, audioConverter)
+		if err != nil {
+			return nil, fmt.Errorf("could not create project for path '%s': %w", config, err)
+		}
+		projects = append(projects, project)
+	}
+
+	return projects, nil
+}
 
 // NewProjectFromPath creates a new Project from a configuration file at the given path.
 // It reads and parses the narr.yaml configuration file and initializes the project with the

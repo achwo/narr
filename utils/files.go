@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // OSAudioFileProvider implements audio file discovery functionality using the OS filesystem
@@ -90,4 +91,24 @@ func GetFilesByExtension(fullpath string, extension string) ([]string, error) {
 	})
 
 	return m4bFiles, err
+}
+
+func GetAllFilesByName(basepath string, name string) ([]string, error) {
+	var files []string
+	err := filepath.WalkDir(basepath, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return fmt.Errorf("failed to access %s: %w", path, err)
+		}
+
+		if d.IsDir() {
+			return nil
+		}
+
+		if strings.HasSuffix(path, name) {
+			files = append(files, path)
+		}
+
+		return nil
+	})
+	return files, err
 }
