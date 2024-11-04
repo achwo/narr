@@ -20,7 +20,7 @@ func TestShowChapters(t *testing.T) {
 	require.Equal(t, "CHAPTER0=00:00:00.000\nCHAPTER0NAME=Chapter 1\n\nCHAPTER1=01:23:20.000\nCHAPTER1NAME=Chapter 2", chapters)
 }
 
-func TestShowMetadata(t *testing.T) {
+func TestMetadata(t *testing.T) {
 	metadataRule := m4b.MetadataRule{
 		Type:   "regex",
 		Tag:    "title",
@@ -45,7 +45,7 @@ date=2002-09-16`,
 	)
 }
 
-func TestShowFilename(t *testing.T) {
+func TestFilename(t *testing.T) {
 	project, err := setupProject()
 	if err != nil {
 		t.Fatal(err)

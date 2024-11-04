@@ -54,6 +54,50 @@ var generateCmd = &cobra.Command{
 var checkCmd = &cobra.Command{
 	Use:   "check <dir>",
 	Short: "Check config for validity",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		path, err := utils.GetValidFullpathFromArgs(args, 0)
+		if err != nil {
+			return fmt.Errorf("could not resolve path %s: %w", args[0], err)
+		}
+
+		project, err := m4b.NewProjectFromPath(path, audioFileProvider, metadataProvider, audioConverter)
+		if err != nil {
+			return err
+		}
+
+		fmt.Println("# Tracks")
+		tracks, err := project.Tracks()
+		if err != nil {
+			return fmt.Errorf("could not get tracks: %w", err)
+		}
+
+		for _, track := range tracks {
+			fmt.Println(track.File)
+		}
+
+		fmt.Println("\n# Chapters")
+		chaptersContent, err := project.Chapters()
+		if err != nil {
+			return fmt.Errorf("could not get chapters: %w", err)
+		}
+		fmt.Println(chaptersContent)
+
+		fmt.Println("\n# Metadata")
+		metadata, err := project.Metadata()
+		if err != nil {
+			return fmt.Errorf("could not get metadata: %w", err)
+		}
+		fmt.Println(metadata)
+
+		fmt.Println("\n# Filename")
+		filename, err := project.Filename()
+		if err != nil {
+			return fmt.Errorf("could not get filename: %w", err)
+		}
+		fmt.Println(filename)
+
+		return nil
+	},
 }
 
 var chaptersCmd = &cobra.Command{
