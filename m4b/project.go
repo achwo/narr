@@ -126,15 +126,19 @@ func (p *Project) ConvertToM4B() (string, error) {
 		files = append(files, track.File)
 	}
 
-	fmt.Printf("Converting %d files to m4a\n", len(files))
-	m4aPath, err := p.m4aPath()
-	if err != nil {
-		return "", fmt.Errorf("could not create m4a path: %w", err)
-	}
+	m4aFiles := files
 
-	m4aFiles, err := p.AudioProcessor.ToM4A(files, m4aPath)
-	if err != nil {
-		return "", fmt.Errorf("could not convert files to m4a: %w", err)
+	if p.Config.ShouldConvert {
+		fmt.Printf("Converting %d files to m4a\n", len(files))
+		m4aPath, err := p.m4aPath()
+		if err != nil {
+			return "", fmt.Errorf("could not create m4a path: %w", err)
+		}
+
+		m4aFiles, err = p.AudioProcessor.ToM4A(files, m4aPath)
+		if err != nil {
+			return "", fmt.Errorf("could not convert files to m4a: %w", err)
+		}
 	}
 
 	fmt.Println("Concating files")

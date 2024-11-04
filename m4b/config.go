@@ -15,6 +15,7 @@ type ProjectConfig struct {
 	MetadataRules []MetadataRule `yaml:"metadataRules"`
 	ChapterRules  []ChapterRule  `yaml:"chapterRules"`
 	ProjectPath   string         `yaml:"projectPath,omitempty"`
+	ShouldConvert bool           `yaml:"shouldConvert"`
 }
 
 // Validate checks if the ProjectConfig is valid by ensuring required fields
