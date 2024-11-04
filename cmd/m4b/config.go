@@ -33,7 +33,6 @@ var generateCmd = &cobra.Command{
 		}
 
 		emptyConfig := m4b.ProjectConfig{
-			AudioFilePath: "",
 			CoverPath:     "",
 			HasChapters:   false,
 			MetadataRules: []m4b.MetadataRule{},

@@ -3,7 +3,6 @@
 package m4b
 
 import (
-	"errors"
 	"fmt"
 	"path/filepath"
 )
@@ -11,7 +10,6 @@ import (
 // ProjectConfig represents the configuration for an M4B audiobook project,
 // including paths to required files and rules for metadata and chapters.
 type ProjectConfig struct {
-	AudioFilePath string         `yaml:"audioFilePath"`
 	CoverPath     string         `yaml:"coverPath"`
 	HasChapters   bool           `yaml:"hasChapters"`
 	MetadataRules []MetadataRule `yaml:"metadataRules"`
@@ -22,10 +20,6 @@ type ProjectConfig struct {
 // Validate checks if the ProjectConfig is valid by ensuring required fields
 // are present and all rules are valid. Returns an error if validation fails.
 func (c *ProjectConfig) Validate() error {
-	if c.AudioFilePath == "" {
-		return errors.New("audioFilePath must be a valid path")
-	}
-
 	for _, rule := range c.MetadataRules {
 		err := rule.Validate()
 		if err != nil {
@@ -46,13 +40,9 @@ func (c *ProjectConfig) Validate() error {
 // FullAudioFilePath returns the absolute path to the audio file.
 // Returns an error if the absolute path cannot be determined.
 func (c *ProjectConfig) FullAudioFilePath() (string, error) {
-	if filepath.IsAbs(c.AudioFilePath) {
-		return c.AudioFilePath, nil
-	}
-
-	audioFilePath, err := filepath.Abs(filepath.Join(c.ProjectPath, c.AudioFilePath))
+	audioFilePath, err := filepath.Abs(c.ProjectPath)
 	if err != nil {
-		return "", fmt.Errorf("could not get absolute path %s, %w", c.AudioFilePath, err)
+		return "", fmt.Errorf("could not get absolute path %s, %w", c.ProjectPath, err)
 	}
 	return audioFilePath, nil
 }
