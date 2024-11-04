@@ -14,7 +14,7 @@ import (
 
 const configFileName = "narr.yaml"
 
-// NewProjectFromPath creates a new BookProject from a configuration file at the given path.
+// NewProjectFromPath creates a new Project from a configuration file at the given path.
 // It reads and parses the narr.yaml configuration file and initializes the project with the
 // provided audio file provider, metadata provider, and audio converter.
 // Returns an error if the configuration file cannot be read or parsed.
@@ -23,7 +23,7 @@ func NewProjectFromPath(
 	audioProvider AudioFileProvider,
 	metadataProvider MetadataProvider,
 	audioConverter AudioProcessor,
-) (*BookProject, error) {
+) (*Project, error) {
 	var fullpath string
 
 	if strings.HasSuffix(path, configFileName) {
@@ -48,7 +48,7 @@ func NewProjectFromPath(
 	return NewProject(config, audioProvider, metadataProvider, audioConverter)
 }
 
-// NewProject creates a new BookProject with the given configuration and providers.
+// NewProject creates a new Project with the given configuration and providers.
 // It validates the configuration before creating the project.
 // Returns an error if the configuration is invalid.
 func NewProject(
@@ -56,13 +56,13 @@ func NewProject(
 	audioProvider AudioFileProvider,
 	metadataProvider MetadataProvider,
 	audioConverter AudioProcessor,
-) (*BookProject, error) {
+) (*Project, error) {
 	err := config.Validate()
 	if err != nil {
 		return nil, err
 	}
 
-	return &BookProject{
+	return &Project{
 		Config:            config,
 		AudioFileProvider: audioProvider,
 		MetadataProvider:  metadataProvider,
@@ -92,17 +92,10 @@ type MetadataProvider interface {
 	ReadMetadata(file string) (string, error)
 }
 
-// Project defines the interface for working with audiobook projects.
-type Project interface {
-	AudioFiles() ([]string, error)
-	ShowChapters() (string, error)
-	ShowMetadata() (string, error)
-}
-
-// BookProject represents an audiobook project that can be converted to M4B format.
+// Project represents an audiobook project that can be converted to M4B format.
 // It contains configuration, providers for audio files and metadata, and an audio processor
 // for handling audio file conversions and manipulations.
-type BookProject struct {
+type Project struct {
 	Config            ProjectConfig
 	AudioFileProvider AudioFileProvider
 	MetadataProvider  MetadataProvider
@@ -114,7 +107,7 @@ type BookProject struct {
 // ConvertToM4B processes all audio files in the project and creates a single M4B audiobook file.
 // It handles conversion to M4A, concatenation, and addition of metadata, cover art, and chapters.
 // Returns the path to the created M4B file and any error encountered during the process.
-func (p *BookProject) ConvertToM4B() (string, error) {
+func (p *Project) ConvertToM4B() (string, error) {
 	p.workDir = filepath.Join(p.Config.ProjectPath, "temp")
 	_ = os.Mkdir(p.workDir, 0755)
 	defer os.RemoveAll(p.workDir)
@@ -201,7 +194,7 @@ func (p *BookProject) ConvertToM4B() (string, error) {
 // Cover returns the path to the cover image for the audiobook.
 // It first checks for a cover specified in the configuration, then attempts to
 // extract a cover from the first audio file if no configuration cover exists.
-func (p *BookProject) Cover() (string, error) {
+func (p *Project) Cover() (string, error) {
 	coverFromConfig := p.Config.CoverPath
 	if !filepath.IsAbs(coverFromConfig) {
 		coverFromConfig = filepath.Join(p.Config.ProjectPath, coverFromConfig)
@@ -222,7 +215,7 @@ func (p *BookProject) Cover() (string, error) {
 // Tracks returns a sorted list of all audio tracks in the project.
 // Tracks are sorted by disc number and track number, with filename as a fallback.
 // Results are cached after the first call.
-func (p *BookProject) Tracks() ([]Track, error) {
+func (p *Project) Tracks() ([]Track, error) {
 	if p.tracks != nil {
 		return p.tracks, nil
 	}
@@ -275,7 +268,7 @@ func (p *BookProject) Tracks() ([]Track, error) {
 
 // Chapters generates chapter markers for the audiobook based on the track metadata
 // and configured chapter rules. Returns the chapter markers in FFmpeg metadata format.
-func (p *BookProject) Chapters() (string, error) {
+func (p *Project) Chapters() (string, error) {
 	tracks, err := p.Tracks()
 	if err != nil {
 		return "", fmt.Errorf("could not load audio files: %w", err)
@@ -332,7 +325,7 @@ func (p *BookProject) Chapters() (string, error) {
 // Metadata returns the audiobook metadata in FFmpeg metadata format.
 // The metadata is derived from the first track and processed according to the
 // configured metadata rules.
-func (p *BookProject) Metadata() (string, error) {
+func (p *Project) Metadata() (string, error) {
 	tags, tagOrder, err := p.getUpdatedMetadata()
 	if err != nil {
 		return "", err
@@ -358,7 +351,7 @@ func (p *BookProject) Metadata() (string, error) {
 
 // Filename returns the output file name for the project.
 // It takes artist and book title from the first file as a basis.
-func (p *BookProject) Filename() (string, error) {
+func (p *Project) Filename() (string, error) {
 	artist, album, err := p.ArtistAndBookTitle()
 	if err != nil {
 		return "", err
@@ -370,7 +363,7 @@ func (p *BookProject) Filename() (string, error) {
 
 // ArtistAndBookTitle reads the metadata from the first track and returns the
 // artist and book title.
-func (p *BookProject) ArtistAndBookTitle() (string, string, error) {
+func (p *Project) ArtistAndBookTitle() (string, string, error) {
 	audioFiles, err := p.Tracks()
 	if err != nil {
 		return "", "", fmt.Errorf("could not load audio files: %w", err)
@@ -399,7 +392,7 @@ func (p *BookProject) ArtistAndBookTitle() (string, string, error) {
 	return artist, album, nil
 }
 
-func (p *BookProject) getUpdatedMetadata() (map[string]string, []string, error) {
+func (p *Project) getUpdatedMetadata() (map[string]string, []string, error) {
 	audioFiles, err := p.Tracks()
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not load audio files: %w", err)
@@ -412,7 +405,7 @@ func (p *BookProject) getUpdatedMetadata() (map[string]string, []string, error) 
 	return audioFiles[0].Metadata, audioFiles[0].TagOrder, nil
 }
 
-func (p *BookProject) getUpdatedFileMetadata(file string) (map[string]string, []string, error) {
+func (p *Project) getUpdatedFileMetadata(file string) (map[string]string, []string, error) {
 	metadata, err := p.MetadataProvider.ReadMetadata(file)
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not read metadata: %w", err)
@@ -430,7 +423,7 @@ func (p *BookProject) getUpdatedFileMetadata(file string) (map[string]string, []
 	return tags, tagOrder, nil
 }
 
-func (p *BookProject) m4aPath() (string, error) {
+func (p *Project) m4aPath() (string, error) {
 	m4aPath := filepath.Join(p.workDir, "m4a")
 
 	if _, err := os.Stat(m4aPath); !errors.Is(err, os.ErrNotExist) {
@@ -444,11 +437,11 @@ func (p *BookProject) m4aPath() (string, error) {
 	return m4aPath, nil
 }
 
-func (p *BookProject) filelistFile() string {
+func (p *Project) filelistFile() string {
 	return filepath.Join(p.workDir, "filelist.txt")
 }
 
-func (p *BookProject) getMetadataTags(metadata string) (map[string]string, []string) {
+func (p *Project) getMetadataTags(metadata string) (map[string]string, []string) {
 	var tags = make(map[string]string)
 
 	lines := strings.Split(metadata, "\n")[1:]
