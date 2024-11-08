@@ -15,10 +15,38 @@ import (
 
 const configFileName = "narr.yaml"
 
+func NewProjectsByArgs(
+	path string,
+	recursive bool,
+	multi bool,
+	audioProvider AudioFileProvider,
+	audioProcessor AudioProcessor,
+	trackFactory TrackFactory,
+) ([]*Project, error) {
+	var projects []*Project
+
+	var err error
+	if recursive {
+		projects, err = NewRecursiveProjectsFromPath(path, audioProvider, audioProcessor, trackFactory)
+	} else if multi {
+		projects, err = NewMultiProjectsFromPath(path, audioProvider, audioProcessor, trackFactory)
+	} else {
+		var project *Project
+		project, err = NewProjectFromPath(path, audioProvider, audioProcessor, trackFactory)
+		projects = append(projects, project)
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("could not create project(s): %w", err)
+	}
+
+	return projects, nil
+}
+
 func NewRecursiveProjectsFromPath(
 	path string,
 	audioProvider AudioFileProvider,
-	audioConverter AudioProcessor,
+	audioProcessor AudioProcessor,
 	trackFactory TrackFactory,
 ) ([]*Project, error) {
 	projectConfigs, err := utils.GetAllFilesByName(path, "narr.yaml")
@@ -29,7 +57,7 @@ func NewRecursiveProjectsFromPath(
 	var projects []*Project
 
 	for _, config := range projectConfigs {
-		project, err := NewProjectFromPath(config, audioProvider, audioConverter, trackFactory)
+		project, err := NewProjectFromPath(config, audioProvider, audioProcessor, trackFactory)
 		if err != nil {
 			return nil, fmt.Errorf("could not create project for path '%s': %w", config, err)
 		}
@@ -42,7 +70,7 @@ func NewRecursiveProjectsFromPath(
 func NewMultiProjectsFromPath(
 	path string,
 	audioProvider AudioFileProvider,
-	audioConverter AudioProcessor,
+	audioProcessor AudioProcessor,
 	trackFactory TrackFactory,
 ) ([]*Project, error) {
 	var fullpath string
@@ -75,7 +103,7 @@ func NewMultiProjectsFromPath(
 		projectConfig := *config
 		projectConfig.ProjectPath = filepath.Join(baseDir, dirEntry.Name())
 
-		project, err := NewProject(projectConfig, audioProvider, audioConverter, trackFactory)
+		project, err := NewProject(projectConfig, audioProvider, audioProcessor, trackFactory)
 		if err != nil {
 			return nil, fmt.Errorf("could not create project for path '%s': %w", dirEntry, err)
 		}

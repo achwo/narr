@@ -15,6 +15,7 @@ var runCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		recursive, _ := cmd.Flags().GetBool("recursive")
 		multi, _ := cmd.Flags().GetBool("multi")
+
 		if recursive && multi {
 			return errors.New("cannot run both recursive and multi at the same time")
 		}
@@ -24,16 +25,14 @@ var runCmd = &cobra.Command{
 			return fmt.Errorf("could not resolve path %s: %w", args[0], err)
 		}
 
-		var projects []*m4b.Project
-		if recursive {
-			projects, err = m4b.NewRecursiveProjectsFromPath(path, audioFileProvider, audioProcessor, trackFactory)
-		} else if multi {
-			projects, err = m4b.NewMultiProjectsFromPath(path, audioFileProvider, audioProcessor, trackFactory)
-		} else {
-			var project *m4b.Project
-			project, err = m4b.NewProjectFromPath(path, audioFileProvider, audioProcessor, trackFactory)
-			projects = append(projects, project)
-		}
+		projects, err := m4b.NewProjectsByArgs(
+			path,
+			recursive,
+			multi,
+			audioFileProvider,
+			audioProcessor,
+			trackFactory,
+		)
 
 		if err != nil {
 			return fmt.Errorf("could not create project(s): %w", err)
@@ -60,6 +59,4 @@ var runCmd = &cobra.Command{
 
 func init() {
 	M4bCmd.AddCommand(runCmd)
-	runCmd.Flags().BoolP("recursive", "r", false, "Search for projects in child dirs recursively and run them all")
-	runCmd.Flags().BoolP("multi", "m", false, "Use provided config for all immediate child dirs and run them all")
 }

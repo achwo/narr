@@ -11,3 +11,9 @@ var M4bCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 	},
 }
+
+func init() {
+	M4bCmd.AddCommand(runCmd)
+	M4bCmd.PersistentFlags().BoolP("recursive", "r", false, "Search for projects in child dirs recursively and run them all")
+	M4bCmd.PersistentFlags().BoolP("multi", "m", false, "Use provided config for all immediate child dirs and run them all")
+}
