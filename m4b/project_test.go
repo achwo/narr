@@ -105,6 +105,7 @@ date=2002-09-16`,
 	fakeAudioProcessor := &m4b.NullAudioProcessor{Data: data}
 	project.AudioProcessor = fakeAudioProcessor
 	project.AudioFileProvider = fakeAudioProvider
+	project.TrackFactory = &m4b.FFmpegTrackFactory{AudioProcessor: fakeAudioProcessor}
 
 	if err != nil {
 		t.Fatal(err)
@@ -162,10 +163,11 @@ date=2002-09-16`,
 	}
 
 	fakeAudioProcessor := &m4b.NullAudioProcessor{Data: data}
+	trackFactory := &m4b.FFmpegTrackFactory{AudioProcessor: fakeAudioProcessor}
 
 	config := m4b.ProjectConfig{ChapterRules: []m4b.ChapterRule{}}
 
-	return m4b.NewProject(config, fakeAudioProvider, fakeAudioProcessor)
+	return m4b.NewProject(config, fakeAudioProvider, fakeAudioProcessor, trackFactory)
 }
 
 // FakeAudioFileProvider implements a test double for providing audio files

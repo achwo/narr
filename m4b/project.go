@@ -19,6 +19,7 @@ func NewRecursiveProjectsFromPath(
 	path string,
 	audioProvider AudioFileProvider,
 	audioConverter AudioProcessor,
+	trackFactory TrackFactory,
 ) ([]*Project, error) {
 	projectConfigs, err := utils.GetAllFilesByName(path, "narr.yaml")
 	if err != nil {
@@ -28,7 +29,7 @@ func NewRecursiveProjectsFromPath(
 	var projects []*Project
 
 	for _, config := range projectConfigs {
-		project, err := NewProjectFromPath(config, audioProvider, audioConverter)
+		project, err := NewProjectFromPath(config, audioProvider, audioConverter, trackFactory)
 		if err != nil {
 			return nil, fmt.Errorf("could not create project for path '%s': %w", config, err)
 		}
@@ -42,6 +43,7 @@ func NewMultiProjectsFromPath(
 	path string,
 	audioProvider AudioFileProvider,
 	audioConverter AudioProcessor,
+	trackFactory TrackFactory,
 ) ([]*Project, error) {
 	var fullpath string
 
@@ -73,7 +75,7 @@ func NewMultiProjectsFromPath(
 		projectConfig := *config
 		projectConfig.ProjectPath = filepath.Join(baseDir, dirEntry.Name())
 
-		project, err := NewProject(projectConfig, audioProvider, audioConverter)
+		project, err := NewProject(projectConfig, audioProvider, audioConverter, trackFactory)
 		if err != nil {
 			return nil, fmt.Errorf("could not create project for path '%s': %w", dirEntry, err)
 		}
@@ -92,6 +94,7 @@ func NewProjectFromPath(
 	path string,
 	audioProvider AudioFileProvider,
 	audioConverter AudioProcessor,
+	trackFactory TrackFactory,
 ) (*Project, error) {
 	var fullpath string
 
@@ -108,7 +111,7 @@ func NewProjectFromPath(
 
 	config.ProjectPath = filepath.Dir(fullpath)
 
-	return NewProject(*config, audioProvider, audioConverter)
+	return NewProject(*config, audioProvider, audioConverter, trackFactory)
 }
 
 func readConfig(fullpath string) (*ProjectConfig, error) {
@@ -133,6 +136,7 @@ func NewProject(
 	config ProjectConfig,
 	audioProvider AudioFileProvider,
 	audioConverter AudioProcessor,
+	trackFactory TrackFactory,
 ) (*Project, error) {
 	err := config.Validate()
 	if err != nil {
@@ -143,6 +147,7 @@ func NewProject(
 		Config:            config,
 		AudioFileProvider: audioProvider,
 		AudioProcessor:    audioConverter,
+		TrackFactory:      trackFactory,
 	}, nil
 }
 
@@ -164,6 +169,11 @@ type AudioProcessor interface {
 	ReadMetadata(file string) (string, error)
 }
 
+type TrackFactory interface {
+	LoadTracks(file []string, metadataRules []MetadataRule) ([]Track, error)
+	LoadTrack(file string, metadataRules []MetadataRule) (Track, error)
+}
+
 // Project represents an audiobook project that can be converted to M4B format.
 // It contains configuration, providers for audio files and metadata, and an audio processor
 // for handling audio file conversions and manipulations.
@@ -171,6 +181,7 @@ type Project struct {
 	Config            ProjectConfig
 	AudioFileProvider AudioFileProvider
 	AudioProcessor    AudioProcessor
+	TrackFactory      TrackFactory
 	tracks            []Track
 	workDir           string
 }
@@ -308,7 +319,10 @@ func (p *Project) Tracks() ([]Track, error) {
 		return nil, err
 	}
 
-	tracks := NewTracks(audioFiles, p.AudioProcessor, p.Config.MetadataRules)
+	tracks, err := p.TrackFactory.LoadTracks(audioFiles, p.Config.MetadataRules)
+	if err != nil {
+		return nil, err
+	}
 
 	slices.SortFunc(tracks, sortTracks)
 	p.tracks = tracks
@@ -348,7 +362,7 @@ func (p *Project) Chapters() (string, error) {
 	for i, track := range tracks {
 		title, duration, err := track.TitleAndDuration()
 		if err != nil {
-			return "", fmt.Errorf("could not read file data for file %s: %w", track, err)
+			return "", fmt.Errorf("could not read file data for file %s: %w", track.File, err)
 		}
 		chapterName := title
 
@@ -460,16 +474,16 @@ func (p *Project) ArtistAndBookTitle() (string, string, error) {
 }
 
 func (p *Project) getUpdatedMetadata() (map[string]string, []string, error) {
-	audioFiles, err := p.Tracks()
+	tracks, err := p.Tracks()
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not load audio files: %w", err)
 	}
 
-	if len(audioFiles) == 0 {
+	if len(tracks) == 0 {
 		return nil, nil, errors.New("no audio files found")
 	}
 
-	metadata, tagOrder, err := audioFiles[0].Metadata()
+	metadata, tagOrder, err := tracks[0].Metadata()
 	if err != nil {
 		return nil, nil, err
 	}
