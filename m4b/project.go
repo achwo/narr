@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/achwo/narr/utils"
 	"gopkg.in/yaml.v3"
@@ -318,40 +319,95 @@ func (p *Project) Tracks() ([]Track, error) {
 		return nil, err
 	}
 
-	tracks := make([]Track, 0, len(audioFiles))
+	start := time.Now()
 
-	for _, file := range audioFiles {
-		metadata, tagOrder, err := p.getUpdatedFileMetadata(file)
-		if err != nil {
-			return nil, fmt.Errorf("could not read metadata for '%s': %w", file, err)
-		}
-		track := Track{File: file, Metadata: metadata, TagOrder: tagOrder}
-		tracks = append(tracks, track)
-
-		if _, exists := track.DiscNumber(); !exists {
-			return nil, fmt.Errorf("track '%s' has no disc number", track.File)
-		}
+	tracks, err := p.filesToTracks(audioFiles)
+	if err != nil {
+		return nil, err
 	}
 
-	slices.SortFunc(tracks, func(a, b Track) int {
-		discI, discIExists := a.DiscNumber()
-		discJ, discJExists := b.DiscNumber()
+	duration := time.Since(start) / time.Millisecond
+	fmt.Printf("%d ms\n", duration)
 
-		if discIExists && discJExists && discI != discJ {
-			return cmp.Compare(discI, discJ)
-		}
-
-		trackNumberI, trackNumberIExists := a.TrackNumber()
-		trackNumberJ, trackNumberJExists := b.TrackNumber()
-
-		if trackNumberIExists && trackNumberJExists && trackNumberI != trackNumberJ {
-			return cmp.Compare(trackNumberI, trackNumberJ)
-		}
-
-		return strings.Compare(a.File, b.File)
-	})
+	slices.SortFunc(tracks, sortTracks)
 	p.tracks = tracks
 	return tracks, nil
+}
+
+func (p *Project) filesToTracks(audioFiles []string) ([]Track, error) {
+	const numWorkers = 5
+	numJobs := len(audioFiles)
+	tracks := make([]Track, 0, len(audioFiles))
+
+	files := make(chan string, numJobs)
+	results := make(chan Track, numJobs)
+	errors := make(chan error, numJobs)
+
+	for i := 0; i < numWorkers; i++ {
+		go p.fileToTrackWorker(files, results, errors)
+	}
+
+	for _, file := range audioFiles {
+		files <- file
+	}
+	close(files)
+
+	for i := 0; i < numJobs; i++ {
+		select {
+		case track := <-results:
+			tracks = append(tracks, track)
+		case err := <-errors:
+			return nil, err
+		}
+	}
+	return tracks, nil
+}
+
+func (p *Project) fileToTrackWorker(
+	files <-chan string,
+	tracks chan<- Track,
+	errors chan<- error,
+) {
+	for j := range files {
+		track, err := p.fileToTrack(j)
+		if err != nil {
+			errors <- err
+			return
+		}
+		tracks <- track
+	}
+}
+
+func (p *Project) fileToTrack(file string) (Track, error) {
+	metadata, tagOrder, err := p.getUpdatedFileMetadata(file)
+	if err != nil {
+		return Track{}, fmt.Errorf("could not read metadata for '%s': %w", file, err)
+	}
+	track := Track{File: file, Metadata: metadata, TagOrder: tagOrder}
+
+	if _, exists := track.DiscNumber(); !exists {
+		return Track{}, fmt.Errorf("track '%s' has no disc number", track.File)
+	}
+
+	return track, nil
+}
+
+func sortTracks(a, b Track) int {
+	discI, discIExists := a.DiscNumber()
+	discJ, discJExists := b.DiscNumber()
+
+	if discIExists && discJExists && discI != discJ {
+		return cmp.Compare(discI, discJ)
+	}
+
+	trackNumberI, trackNumberIExists := a.TrackNumber()
+	trackNumberJ, trackNumberJExists := b.TrackNumber()
+
+	if trackNumberIExists && trackNumberJExists && trackNumberI != trackNumberJ {
+		return cmp.Compare(trackNumberI, trackNumberJ)
+	}
+
+	return strings.Compare(a.File, b.File)
 }
 
 // Chapters generates chapter markers for the audiobook based on the track metadata
