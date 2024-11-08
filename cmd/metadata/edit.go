@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"regexp"
 
+	"github.com/achwo/narr/m4b"
 	"github.com/achwo/narr/utils"
 	"github.com/spf13/cobra"
 )
@@ -34,10 +35,10 @@ var editCmd = &cobra.Command{
 			return fmt.Errorf("could not get files: %w", err)
 		}
 
-		metadataManager := &utils.FFmpegMetadataProvider{}
+		audioProcesoor := &m4b.FFmpegAudioProcessor{}
 
 		for _, file := range files {
-			metadata, err := metadataManager.ReadMetadata(file)
+			metadata, err := audioProcesoor.ReadMetadata(file)
 			if err != nil {
 				return fmt.Errorf("failed to read metadata of %s: %w", file, err)
 			}
@@ -71,7 +72,7 @@ var editCmd = &cobra.Command{
 				fmt.Println("Changing metadata in file", file)
 			}
 
-			if err = metadataManager.WriteMetadata(file, updatedMetadata, verbose); err != nil {
+			if err = audioProcesoor.WriteMetadata(file, updatedMetadata, verbose); err != nil {
 				return fmt.Errorf("could not write metadata: %w", err)
 			}
 

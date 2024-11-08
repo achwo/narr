@@ -6,6 +6,8 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -210,4 +212,104 @@ func (p *FFmpegAudioProcessor) createMetadataFile(m4bFile string, metadata strin
 func (p *FFmpegAudioProcessor) ChangeFileExtension(file string, ext string) string {
 	withoutExt := strings.TrimSuffix(file, filepath.Ext(file))
 	return withoutExt + ext
+}
+
+// ReadTitleAndDuration extracts the title and duration from a media file
+// Returns the title string and duration in seconds
+func (p *FFmpegAudioProcessor) ReadTitleAndDuration(file string) (string, float64, error) {
+	dataCmd := p.Command.Create(
+		"ffprobe",
+		"-v",
+		"error",
+		"-select_streams",
+		"a:0",
+		"-show_entries",
+		"format=duration:format_tags=title",
+		file,
+	)
+
+	var data bytes.Buffer
+
+	if err := dataCmd.Run(&data, &data); err != nil {
+		return "", 0, fmt.Errorf("failed to extract metadata for file %s: %w", file, err)
+	}
+
+	probeContent := data.String()
+
+	durationRegex := regexp.MustCompile(`duration=([0-9]+\.[0-9]+)`)
+	titleRegex := regexp.MustCompile(`TAG:title=(.+)`)
+
+	titleMatch := titleRegex.FindStringSubmatch(probeContent)
+	if len(titleMatch) < 2 {
+		return "", 0, fmt.Errorf("title not found")
+	}
+
+	title := titleMatch[1]
+
+	durationMatch := durationRegex.FindStringSubmatch(probeContent)
+	if len(durationMatch) < 2 {
+		return "", 0, fmt.Errorf("duration not found")
+	}
+
+	duration, err := strconv.ParseFloat(durationMatch[1], 64)
+	if err != nil {
+		return "", 0, fmt.Errorf("invalid duration value")
+	}
+
+	return title, duration, nil
+}
+
+// WriteMetadata updates the metadata in the file
+// WriteMetadata updates the metadata in the media file
+// Creates a temporary file during the process and replaces the original file
+// If verbose is true, prints FFmpeg command and output
+func (p *FFmpegAudioProcessor) WriteMetadata(file string, metadata string, verbose bool) error {
+	tmpFile := file + ".tmp" + filepath.Ext(file)
+
+	err := p.WriteMetadataO(file, tmpFile, metadata, verbose)
+	if err != nil {
+		return fmt.Errorf("could not write metadata: %w", err)
+	}
+
+	err = os.Rename(tmpFile, file)
+	if err != nil {
+		return fmt.Errorf("could not rename temp file to output file: %w", err)
+	}
+
+	return nil
+}
+
+// WriteMetadataO is like WriteMetadata with explicit output file
+// WriteMetadataO writes metadata to a new output file instead of modifying the input file
+// If verbose is true, prints FFmpeg command and output
+func (p *FFmpegAudioProcessor) WriteMetadataO(inputFile string, outputFile string, metadata string, verbose bool) error {
+	writeCmd := p.Command.Create("ffmpeg", "-i", inputFile, "-f", "ffmetadata", "-i", "-", "-map_metadata", "1", "-c", "copy", outputFile)
+
+	var outBuf bytes.Buffer
+
+	err := writeCmd.RunI(bytes.NewReader([]byte(metadata)), &outBuf, &outBuf)
+
+	if verbose {
+		fmt.Printf("Command output:\n%s\n", outBuf.String())
+	}
+
+	if err != nil {
+		return fmt.Errorf("ffmpeg command failed: %v\n%s", err, outBuf.String())
+	}
+	return nil
+}
+
+// ReadMetadata extracts metadata from a media file at the given path
+// Returns the metadata as a string in FFmpeg metadata format
+func (p *FFmpegAudioProcessor) ReadMetadata(path string) (string, error) {
+	extractCmd := p.Command.Create("ffmpeg", "-i", path, "-f", "ffmetadata", "-")
+
+	var metadata, errout bytes.Buffer
+
+	if err := extractCmd.Run(&metadata, &errout); err != nil {
+		fmt.Println(errout.String())
+		return "", fmt.Errorf("failed to extract metadata for file %s: %w", path, err)
+	}
+
+	return metadata.String(), nil
 }

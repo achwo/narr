@@ -18,7 +18,6 @@ const configFileName = "narr.yaml"
 func NewRecursiveProjectsFromPath(
 	path string,
 	audioProvider AudioFileProvider,
-	metadataProvider MetadataProvider,
 	audioConverter AudioProcessor,
 ) ([]*Project, error) {
 	projectConfigs, err := utils.GetAllFilesByName(path, "narr.yaml")
@@ -29,7 +28,7 @@ func NewRecursiveProjectsFromPath(
 	var projects []*Project
 
 	for _, config := range projectConfigs {
-		project, err := NewProjectFromPath(config, audioProvider, metadataProvider, audioConverter)
+		project, err := NewProjectFromPath(config, audioProvider, audioConverter)
 		if err != nil {
 			return nil, fmt.Errorf("could not create project for path '%s': %w", config, err)
 		}
@@ -42,7 +41,6 @@ func NewRecursiveProjectsFromPath(
 func NewMultiProjectsFromPath(
 	path string,
 	audioProvider AudioFileProvider,
-	metadataProvider MetadataProvider,
 	audioConverter AudioProcessor,
 ) ([]*Project, error) {
 	var fullpath string
@@ -75,7 +73,7 @@ func NewMultiProjectsFromPath(
 		projectConfig := *config
 		projectConfig.ProjectPath = filepath.Join(baseDir, dirEntry.Name())
 
-		project, err := NewProject(projectConfig, audioProvider, metadataProvider, audioConverter)
+		project, err := NewProject(projectConfig, audioProvider, audioConverter)
 		if err != nil {
 			return nil, fmt.Errorf("could not create project for path '%s': %w", dirEntry, err)
 		}
@@ -93,7 +91,6 @@ func NewMultiProjectsFromPath(
 func NewProjectFromPath(
 	path string,
 	audioProvider AudioFileProvider,
-	metadataProvider MetadataProvider,
 	audioConverter AudioProcessor,
 ) (*Project, error) {
 	var fullpath string
@@ -111,7 +108,7 @@ func NewProjectFromPath(
 
 	config.ProjectPath = filepath.Dir(fullpath)
 
-	return NewProject(*config, audioProvider, metadataProvider, audioConverter)
+	return NewProject(*config, audioProvider, audioConverter)
 }
 
 func readConfig(fullpath string) (*ProjectConfig, error) {
@@ -135,7 +132,6 @@ func readConfig(fullpath string) (*ProjectConfig, error) {
 func NewProject(
 	config ProjectConfig,
 	audioProvider AudioFileProvider,
-	metadataProvider MetadataProvider,
 	audioConverter AudioProcessor,
 ) (*Project, error) {
 	err := config.Validate()
@@ -146,7 +142,6 @@ func NewProject(
 	return &Project{
 		Config:            config,
 		AudioFileProvider: audioProvider,
-		MetadataProvider:  metadataProvider,
 		AudioProcessor:    audioConverter,
 	}, nil
 }
@@ -165,10 +160,6 @@ type AudioProcessor interface {
 	AddCover(m4bFile string, coverFile string) error
 	ExtractCover(m4aFile string, workDir string) (string, error)
 	AddChapters(m4bFile string, chapters string) error
-}
-
-// MetadataProvider defines the interface for reading metadata from audio files.
-type MetadataProvider interface {
 	ReadTitleAndDuration(file string) (string, float64, error)
 	ReadMetadata(file string) (string, error)
 }
@@ -179,7 +170,6 @@ type MetadataProvider interface {
 type Project struct {
 	Config            ProjectConfig
 	AudioFileProvider AudioFileProvider
-	MetadataProvider  MetadataProvider
 	AudioProcessor    AudioProcessor
 	tracks            []Track
 	workDir           string
@@ -318,7 +308,7 @@ func (p *Project) Tracks() ([]Track, error) {
 		return nil, err
 	}
 
-	tracks := NewTracks(audioFiles, p.MetadataProvider, p.Config.MetadataRules)
+	tracks := NewTracks(audioFiles, p.AudioProcessor, p.Config.MetadataRules)
 
 	slices.SortFunc(tracks, sortTracks)
 	p.tracks = tracks

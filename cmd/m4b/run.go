@@ -26,12 +26,12 @@ var runCmd = &cobra.Command{
 
 		var projects []*m4b.Project
 		if recursive {
-			projects, err = m4b.NewRecursiveProjectsFromPath(path, audioFileProvider, metadataProvider, audioConverter)
+			projects, err = m4b.NewRecursiveProjectsFromPath(path, audioFileProvider, audioConverter)
 		} else if multi {
-			projects, err = m4b.NewMultiProjectsFromPath(path, audioFileProvider, metadataProvider, audioConverter)
+			projects, err = m4b.NewMultiProjectsFromPath(path, audioFileProvider, audioConverter)
 		} else {
 			var project *m4b.Project
-			project, err = m4b.NewProjectFromPath(path, audioFileProvider, metadataProvider, audioConverter)
+			project, err = m4b.NewProjectFromPath(path, audioFileProvider, audioConverter)
 			projects = append(projects, project)
 		}
 

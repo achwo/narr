@@ -11,7 +11,6 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-var metadataProvider m4b.MetadataProvider = &utils.FFmpegMetadataProvider{}
 var audioFileProvider m4b.AudioFileProvider = &utils.OSAudioFileProvider{}
 var audioConverter m4b.AudioProcessor = &m4b.FFmpegAudioProcessor{
 	Command: &m4b.ExecCommand{},
@@ -60,7 +59,7 @@ var checkCmd = &cobra.Command{
 			return fmt.Errorf("could not resolve path %s: %w", args[0], err)
 		}
 
-		project, err := m4b.NewProjectFromPath(path, audioFileProvider, metadataProvider, audioConverter)
+		project, err := m4b.NewProjectFromPath(path, audioFileProvider, audioConverter)
 		if err != nil {
 			return err
 		}
@@ -109,7 +108,7 @@ var chaptersCmd = &cobra.Command{
 			return fmt.Errorf("could not resolve path %s: %w", args[0], err)
 		}
 
-		project, err := m4b.NewProjectFromPath(path, audioFileProvider, metadataProvider, audioConverter)
+		project, err := m4b.NewProjectFromPath(path, audioFileProvider, audioConverter)
 		if err != nil {
 			return err
 		}
@@ -137,7 +136,7 @@ var metadataCmd = &cobra.Command{
 			return fmt.Errorf("could not resolve path %s: %w", args[0], err)
 		}
 
-		project, err := m4b.NewProjectFromPath(path, audioFileProvider, metadataProvider, audioConverter)
+		project, err := m4b.NewProjectFromPath(path, audioFileProvider, audioConverter)
 		if err != nil {
 			return fmt.Errorf("could not load config %s: %w", path, err)
 		}
@@ -162,7 +161,7 @@ var filenameCmd = &cobra.Command{
 			return fmt.Errorf("could not resolve path %s: %w", args[0], err)
 		}
 
-		project, err := m4b.NewProjectFromPath(path, audioFileProvider, metadataProvider, audioConverter)
+		project, err := m4b.NewProjectFromPath(path, audioFileProvider, audioConverter)
 		if err != nil {
 			return fmt.Errorf("could not load config %s: %w", path, err)
 		}
@@ -187,7 +186,7 @@ var filesCmd = &cobra.Command{
 			return fmt.Errorf("could not resolve path %s: %w", args[0], err)
 		}
 
-		project, err := m4b.NewProjectFromPath(path, audioFileProvider, metadataProvider, audioConverter)
+		project, err := m4b.NewProjectFromPath(path, audioFileProvider, audioConverter)
 		if err != nil {
 			return fmt.Errorf("could not load config %s: %w", path, err)
 		}

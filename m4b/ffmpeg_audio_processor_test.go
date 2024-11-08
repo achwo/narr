@@ -223,7 +223,12 @@ type FakeCmd struct {
 	Executed bool
 }
 
-func (c *FakeCmd) Run(_ *bytes.Buffer, _ *bytes.Buffer) error {
+func (c *FakeCmd) Run(_, _ *bytes.Buffer) error {
+	c.Executed = true
+	return nil
+}
+
+func (c *FakeCmd) RunI(_ *bytes.Reader, _, _ *bytes.Buffer) error {
 	c.Executed = true
 	return nil
 }

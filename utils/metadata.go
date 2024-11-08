@@ -1,9 +1,26 @@
 package utils
 
 import (
+	"fmt"
 	"regexp"
 	"strings"
 )
+
+// TagWithValue represents a metadata tag and its associated value
+type TagWithValue struct {
+	Tag   string // The metadata tag name
+	Value string // The value associated with the tag
+}
+
+// Prefix returns the tag name with an equals sign appended
+func (t TagWithValue) Prefix() string {
+	return fmt.Sprintf("%s=", t.Tag)
+}
+
+// String returns the tag and value formatted as "tag=value"
+func (t TagWithValue) String() string {
+	return fmt.Sprintf("%s=%s", t.Tag, t.Value)
+}
 
 // GetMetadataTagValues returns metadata tag values from a string
 // Deprecated: Use Project#GetMetadataTags instead

@@ -7,7 +7,8 @@ import (
 
 // Cmd represents an executable command that can be run with stdout/stderr capture
 type Cmd interface {
-	Run(stdout *bytes.Buffer, stderr *bytes.Buffer) error
+	Run(stdout, stderr *bytes.Buffer) error
+	RunI(stdin *bytes.Reader, stdout, stderr *bytes.Buffer) error
 }
 
 // Command is a factory interface for creating executable commands
@@ -30,6 +31,14 @@ type ExecCmd struct {
 
 // Run executes the command and captures its output in the provided stdout and stderr buffers
 func (c *ExecCmd) Run(stdout *bytes.Buffer, stderr *bytes.Buffer) error {
+	c.cmd.Stderr = stderr
+	c.cmd.Stdout = stdout
+	return c.cmd.Run()
+}
+
+// RunI works like Run, except that it also takes a stdin
+func (c *ExecCmd) RunI(stdin *bytes.Reader, stdout, stderr *bytes.Buffer) error {
+	c.cmd.Stdin = stderr
 	c.cmd.Stderr = stderr
 	c.cmd.Stdout = stdout
 	return c.cmd.Run()

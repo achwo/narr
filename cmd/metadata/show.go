@@ -3,6 +3,7 @@ package metadata
 import (
 	"fmt"
 
+	"github.com/achwo/narr/m4b"
 	"github.com/achwo/narr/utils"
 
 	"github.com/spf13/cobra"
@@ -25,9 +26,11 @@ var showCmd = &cobra.Command{
 			return fmt.Errorf("failed to read files within %s: %w", path, err)
 		}
 
-		metadataManager := utils.FFmpegMetadataProvider{}
+		audioProcessor := m4b.FFmpegAudioProcessor{
+			Command: &m4b.ExecCommand{},
+		}
 		for _, file := range files {
-			metadata, err := metadataManager.ReadMetadata(file)
+			metadata, err := audioProcessor.ReadMetadata(file)
 			if err != nil {
 				return fmt.Errorf("failed to read metadata of %s: %w", file, err)
 			}

@@ -5,28 +5,28 @@ import (
 	"strings"
 )
 
-func NewTracks(files []string, metadataProvider MetadataProvider, metadataRules []MetadataRule) []Track {
+func NewTracks(files []string, audioProcessor AudioProcessor, metadataRules []MetadataRule) []Track {
 	tracks := make([]Track, 0, len(files))
 
 	for _, file := range files {
-		tracks = append(tracks, NewTrack(file, metadataProvider, metadataRules))
+		tracks = append(tracks, NewTrack(file, audioProcessor, metadataRules))
 	}
 
 	return tracks
 }
 
 // NewTrack returns a Track with the given props.
-func NewTrack(file string, metadataProvider MetadataProvider, metadataRule []MetadataRule) Track {
-	return Track{File: file, MetadataProvider: metadataProvider, MetadataRules: metadataRule}
+func NewTrack(file string, audioProcessor AudioProcessor, metadataRule []MetadataRule) Track {
+	return Track{File: file, AudioProcessor: audioProcessor, MetadataRules: metadataRule}
 }
 
 // Track represents an audio track with its file path and associated metadata.
 // It contains the file path, a map of metadata tags, and the order in which
 // the tags should be preserved.
 type Track struct {
-	File             string // Path to the audio file
-	MetadataProvider MetadataProvider
-	MetadataRules    []MetadataRule
+	File           string // Path to the audio file
+	AudioProcessor AudioProcessor
+	MetadataRules  []MetadataRule
 
 	metadata map[string]string // Map of metadata tags and their values
 	tagOrder []string          // Ordered list of metadata tag names
@@ -72,7 +72,7 @@ func (t *Track) TrackNumber() (int, bool) {
 
 func (t *Track) Metadata() (map[string]string, []string, error) {
 	if t.metadata == nil {
-		metadata, err := t.MetadataProvider.ReadMetadata(t.File)
+		metadata, err := t.AudioProcessor.ReadMetadata(t.File)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -104,7 +104,7 @@ func (t *Track) MetadataTag(tag string) (string, bool) {
 }
 
 func (t *Track) TitleAndDuration() (string, float64, error) {
-	return t.MetadataProvider.ReadTitleAndDuration(t.File)
+	return t.AudioProcessor.ReadTitleAndDuration(t.File)
 }
 
 func (t *Track) getMetadataTags(metadata string) (map[string]string, []string) {

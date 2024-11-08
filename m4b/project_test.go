@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/achwo/narr/m4b"
-	"github.com/achwo/narr/testutils"
 	"github.com/stretchr/testify/require"
 )
 
@@ -61,13 +60,13 @@ func TestTracks(t *testing.T) {
 	// should return all files within the project folder sorted by cd and track numbers
 	project, err := setupProject()
 
-	fakeAudioProvider := &testutils.FakeAudioFileProvider{
+	fakeAudioProvider := &FakeAudioFileProvider{
 		Files: []string{"file1.m4a", "file2.m4a", "file3.m4a"},
 	}
 
-	data := make(map[string]testutils.FileData)
+	data := make(map[string]m4b.FileData)
 
-	data["file1.m4a"] = testutils.FileData{
+	data["file1.m4a"] = m4b.FileData{
 		Title:    "Chapter 1",
 		Duration: 5000,
 		Metadata: `;FFMETADATA1
@@ -79,7 +78,7 @@ disc=1/10
 date=2002-09-16`,
 	}
 
-	data["file2.m4a"] = testutils.FileData{
+	data["file2.m4a"] = m4b.FileData{
 		Title:    "Chapter 1",
 		Duration: 5000,
 		Metadata: `;FFMETADATA1
@@ -91,7 +90,7 @@ disc=1/10
 date=2002-09-16`,
 	}
 
-	data["file3.m4a"] = testutils.FileData{
+	data["file3.m4a"] = m4b.FileData{
 		Title:    "Chapter 2",
 		Duration: 5000,
 		Metadata: `;FFMETADATA1
@@ -103,9 +102,8 @@ disc=2/10
 date=2002-09-16`,
 	}
 
-	fakeMetadataProvider := &testutils.FakeMetadataProvider{Data: data}
-
-	project.MetadataProvider = fakeMetadataProvider
+	fakeAudioProcessor := &m4b.NullAudioProcessor{Data: data}
+	project.AudioProcessor = fakeAudioProcessor
 	project.AudioFileProvider = fakeAudioProvider
 
 	if err != nil {
@@ -122,13 +120,13 @@ date=2002-09-16`,
 }
 
 func setupProject() (*m4b.Project, error) {
-	fakeAudioProvider := &testutils.FakeAudioFileProvider{
+	fakeAudioProvider := &FakeAudioFileProvider{
 		Files: []string{"file1.m4a", "file2.m4a"},
 	}
 
-	data := make(map[string]testutils.FileData)
+	data := make(map[string]m4b.FileData)
 
-	data["file1.m4a"] = testutils.FileData{
+	data["file1.m4a"] = m4b.FileData{
 		Title:    "Chapter 1",
 		Duration: 5000,
 		Metadata: `;FFMETADATA1
@@ -139,7 +137,7 @@ track=1/16
 disc=1/10
 date=2002-09-16`,
 	}
-	data["file2.m4a"] = testutils.FileData{
+	data["file2.m4a"] = m4b.FileData{
 		Title:    "Chapter 1",
 		Duration: 5000,
 		Metadata: `;FFMETADATA1
@@ -151,7 +149,7 @@ disc=2/10
 date=2002-09-16`,
 	}
 
-	data["file2.m4a"] = testutils.FileData{
+	data["file2.m4a"] = m4b.FileData{
 		Title:    "Chapter 2",
 		Duration: 5000,
 		Metadata: `;FFMETADATA1
@@ -163,10 +161,23 @@ disc=2/10
 date=2002-09-16`,
 	}
 
-	fakeMetadataProvider := &testutils.FakeMetadataProvider{Data: data}
-	fakeAudioConverter := &m4b.NullAudioProcessor{}
+	fakeAudioProcessor := &m4b.NullAudioProcessor{Data: data}
 
 	config := m4b.ProjectConfig{ChapterRules: []m4b.ChapterRule{}}
 
-	return m4b.NewProject(config, fakeAudioProvider, fakeMetadataProvider, fakeAudioConverter)
+	return m4b.NewProject(config, fakeAudioProvider, fakeAudioProcessor)
+}
+
+// FakeAudioFileProvider implements a test double for providing audio files
+type FakeAudioFileProvider struct {
+	Files []string // Files to return from AudioFiles
+	Err   error    // Error to return, if any
+}
+
+// AudioFiles returns the preconfigured Files slice and Err value
+func (f *FakeAudioFileProvider) AudioFiles(fullPath string) ([]string, error) {
+	if f.Err != nil {
+		return nil, f.Err
+	}
+	return f.Files, nil
 }
