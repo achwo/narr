@@ -104,7 +104,7 @@ func NewProjectFromPath(
 		fullpath = filepath.Join(path, configFileName)
 	}
 
-	config, err := readConfig(path)
+	config, err := readConfig(fullpath)
 	if err != nil {
 		return nil, err
 	}
@@ -208,8 +208,13 @@ func (p *Project) ConvertToM4B() (string, error) {
 		files = append(files, track.File)
 	}
 
-	m4aFiles := files
+	// running chapters before conversion to prevent long wait before error
+	chapters, err := p.Chapters()
+	if err != nil {
+		return "", fmt.Errorf("could not get chapters: %w", err)
+	}
 
+	m4aFiles := files
 	if p.Config.ShouldConvert {
 		fmt.Printf("Converting %d files to m4a\n", len(files))
 		m4aPath, err := p.m4aPath()
@@ -218,6 +223,7 @@ func (p *Project) ConvertToM4B() (string, error) {
 		}
 
 		m4aFiles, err = p.AudioProcessor.ToM4A(files, m4aPath)
+
 		if err != nil {
 			return "", fmt.Errorf("could not convert files to m4a: %w", err)
 		}
@@ -255,11 +261,6 @@ func (p *Project) ConvertToM4B() (string, error) {
 	}
 
 	fmt.Println("Adding chapters to m4b")
-	chapters, err := p.Chapters()
-	if err != nil {
-		return "", fmt.Errorf("could not get chapters: %w", err)
-	}
-
 	if err = p.AudioProcessor.AddChapters(m4bFile, chapters); err != nil {
 		return "", fmt.Errorf("could not add chapters to %s: %w", m4bFile, err)
 	}

@@ -3,6 +3,7 @@ package m4b
 import (
 	"bytes"
 	"os"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -19,19 +20,15 @@ func TestFFmpegAudioProcessor_ToM4A(t *testing.T) {
 	files, err := processor.ToM4A(inputFiles, output)
 	require.NoError(t, err)
 
-	require.Equal(
+	require.ElementsMatch(
 		t,
-		[]string{"ffmpeg", "-i", "filepath1.m4a", "-c", "copy", "-c:a", "aac_at", "output/filepath1.m4a"},
-		fakeCommand.CreatedCommands[0],
+		[][]string{
+			{"ffmpeg", "-i", "filepath1.m4a", "-c", "copy", "-c:a", "aac_at", "output/filepath1.m4a"},
+			{"ffmpeg", "-i", "filepath2.m4a", "-c", "copy", "-c:a", "aac_at", "output/filepath2.m4a"},
+		},
+		fakeCommand.CreatedCommands,
 	)
-
-	require.Equal(
-		t,
-		[]string{"ffmpeg", "-i", "filepath2.m4a", "-c", "copy", "-c:a", "aac_at", "output/filepath2.m4a"},
-		fakeCommand.CreatedCommands[1],
-	)
-
-	require.Equal(
+	require.ElementsMatch(
 		t,
 		[]string{"output/filepath1.m4a", "output/filepath2.m4a"},
 		files,
@@ -206,11 +203,15 @@ func TestFFmpegAudioProcessor_AddCover(t *testing.T) {
 }
 
 type FakeCommand struct {
+	mu              sync.Mutex
 	CreatedCommands [][]string
 	Cmd             *FakeCmd
 }
 
 func (c *FakeCommand) Create(name string, args ...string) Cmd {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	fullArgs := append([]string{name}, args...)
 	c.CreatedCommands = append(c.CreatedCommands, fullArgs)
 	c.Cmd = &FakeCmd{Stdout: "", Stderr: "", Executed: false}

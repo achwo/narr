@@ -21,22 +21,73 @@ type FFmpegAudioProcessor struct {
 // Returns a slice of converted file paths or an error
 func (p *FFmpegAudioProcessor) ToM4A(files []string, outputPath string) ([]string, error) {
 	outputFiles := make([]string, 0, len(files))
-	for _, file := range files {
+
+	const numWorkers = 5
+
+	in := make(chan string, numWorkers)
+	out := make(chan string, numWorkers)
+	errs := make(chan error, numWorkers)
+
+	for i := 0; i < numWorkers; i++ {
+		go p.convertToM4AWorker(in, out, errs, outputPath)
+	}
+
+	go func() {
+		for _, file := range files {
+			in <- file
+		}
+		close(in)
+	}()
+
+	for i := 0; i < len(files); i++ {
+		select {
+		case m4a := <-out:
+			outputFiles = append(outputFiles, m4a)
+			fmt.Print(".")
+		case err := <-errs:
+			return nil, fmt.Errorf("could not convert track: %w", err)
+		}
+	}
+
+	// for _, file := range files {
+	// 	fileName := filepath.Base(file)
+	// 	out := path.Join(outputPath, fileName)
+	// 	outputFiles = append(outputFiles, out)
+	// 	cmd := p.Command.Create("ffmpeg", "-i", file, "-c", "copy", "-c:a", "aac_at", out)
+	//
+	// 	var outBuf bytes.Buffer
+	// 	err := cmd.Run(&outBuf, &outBuf)
+	// 	if err != nil {
+	// 		fmt.Println(outBuf.String())
+	// 		return nil, fmt.Errorf("could not convert file %s:, %w", out, err)
+	// 	}
+	// 	fmt.Print(".")
+	// }
+	fmt.Println()
+	return outputFiles, nil
+}
+
+func (p *FFmpegAudioProcessor) convertToM4AWorker(
+	in <-chan string,
+	out chan<- string,
+	error chan<- error,
+	outputPath string,
+) {
+	for file := range in {
 		fileName := filepath.Base(file)
-		out := path.Join(outputPath, fileName)
-		outputFiles = append(outputFiles, out)
-		cmd := p.Command.Create("ffmpeg", "-i", file, "-c", "copy", "-c:a", "aac_at", out)
+		outFile := path.Join(outputPath, fileName)
+		cmd := p.Command.Create("ffmpeg", "-i", file, "-c", "copy", "-c:a", "aac_at", outFile)
 
 		var outBuf bytes.Buffer
 		err := cmd.Run(&outBuf, &outBuf)
 		if err != nil {
 			fmt.Println(outBuf.String())
-			return nil, fmt.Errorf("could not convert file %s:, %w", out, err)
+			error <- fmt.Errorf("could not convert file %s:, %w", outFile, err)
+			continue
 		}
-		fmt.Print(".")
+
+		out <- outFile
 	}
-	fmt.Println()
-	return outputFiles, nil
 }
 
 // Concat concatenates multiple audio files into a single M4B file
@@ -231,7 +282,7 @@ func (p *FFmpegAudioProcessor) ReadTitleAndDuration(file string) (string, float6
 	var data bytes.Buffer
 
 	if err := dataCmd.Run(&data, &data); err != nil {
-		return "", 0, fmt.Errorf("failed to extract metadata for file %s: %w", file, err)
+		return "", 0, fmt.Errorf("failed to extract title and duration for file %s: %w", file, err)
 	}
 
 	probeContent := data.String()

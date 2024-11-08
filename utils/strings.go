@@ -23,7 +23,7 @@ func ApplyRegex(input string, regex *regexp.Regexp, format string) (string, erro
 	expectedMatchLen := strings.Count(format, "%s")
 
 	if !regex.MatchString(input) {
-		return input, fmt.Errorf("input '%s' does not match regex pattern '%s'", input, regex.String())
+		return input, nil
 	}
 
 	matches := regex.FindStringSubmatch(input)

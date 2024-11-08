@@ -21,9 +21,12 @@ func (t *FFmpegTrackFactory) LoadTracks(
 		go t.worker(filesCh, tracksCh, errorsCh, metadataRules)
 	}
 
-	for _, file := range files {
-		filesCh <- file
-	}
+	go func() {
+		for _, file := range files {
+			filesCh <- file
+		}
+		close(filesCh)
+	}()
 
 	for i := 0; i < len(files); i++ {
 		select {
@@ -35,6 +38,17 @@ func (t *FFmpegTrackFactory) LoadTracks(
 	}
 
 	return tracks, nil
+}
+
+func (t *FFmpegTrackFactory) worker(in <-chan string, out chan<- Track, errors chan<- error, rules []MetadataRule) {
+	for file := range in {
+		track, err := t.LoadTrack(file, rules)
+		if err != nil {
+			errors <- err
+			continue
+		}
+		out <- track
+	}
 }
 
 func (t *FFmpegTrackFactory) LoadTrack(
@@ -57,15 +71,4 @@ func (t *FFmpegTrackFactory) LoadTrack(
 		duration:      duration,
 		MetadataRules: metadataRules,
 	}, nil
-}
-
-func (t *FFmpegTrackFactory) worker(in <-chan string, out chan<- Track, errors chan<- error, rules []MetadataRule) {
-	for {
-		file := <-in
-		track, err := t.LoadTrack(file, rules)
-		if err != nil {
-			errors <- err
-		}
-		out <- track
-	}
 }
