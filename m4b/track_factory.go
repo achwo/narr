@@ -12,12 +12,26 @@ func (t *FFmpegTrackFactory) LoadTracks(
 ) ([]Track, error) {
 	tracks := make([]Track, 0, len(files))
 
+	const numWorkers = 5
+	filesCh := make(chan string, numWorkers)
+	tracksCh := make(chan Track, numWorkers)
+	errorsCh := make(chan error, numWorkers)
+
+	for i := 0; i < numWorkers; i++ {
+		go t.worker(filesCh, tracksCh, errorsCh, metadataRules)
+	}
+
 	for _, file := range files {
-		track, err := t.LoadTrack(file, metadataRules)
-		if err != nil {
-			return nil, fmt.Errorf("could not load track %s: %w", file, err)
+		filesCh <- file
+	}
+
+	for i := 0; i < len(files); i++ {
+		select {
+		case track := <-tracksCh:
+			tracks = append(tracks, track)
+		case err := <-errorsCh:
+			return nil, fmt.Errorf("could not load track: %w", err)
 		}
-		tracks = append(tracks, track)
 	}
 
 	return tracks, nil
@@ -43,4 +57,15 @@ func (t *FFmpegTrackFactory) LoadTrack(
 		duration:      duration,
 		MetadataRules: metadataRules,
 	}, nil
+}
+
+func (t *FFmpegTrackFactory) worker(in <-chan string, out chan<- Track, errors chan<- error, rules []MetadataRule) {
+	for {
+		file := <-in
+		track, err := t.LoadTrack(file, rules)
+		if err != nil {
+			errors <- err
+		}
+		out <- track
+	}
 }
