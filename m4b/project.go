@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
-	"time"
 
 	"github.com/achwo/narr/utils"
 	"gopkg.in/yaml.v3"
@@ -319,77 +318,11 @@ func (p *Project) Tracks() ([]Track, error) {
 		return nil, err
 	}
 
-	start := time.Now()
-
-	tracks, err := p.filesToTracks(audioFiles)
-	if err != nil {
-		return nil, err
-	}
-
-	duration := time.Since(start) / time.Millisecond
-	fmt.Printf("%d ms\n", duration)
+	tracks := NewTracks(audioFiles, p.MetadataProvider, p.Config.MetadataRules)
 
 	slices.SortFunc(tracks, sortTracks)
 	p.tracks = tracks
 	return tracks, nil
-}
-
-func (p *Project) filesToTracks(audioFiles []string) ([]Track, error) {
-	const numWorkers = 5
-	numJobs := len(audioFiles)
-	tracks := make([]Track, 0, len(audioFiles))
-
-	files := make(chan string, numJobs)
-	results := make(chan Track, numJobs)
-	errors := make(chan error, numJobs)
-
-	for i := 0; i < numWorkers; i++ {
-		go p.fileToTrackWorker(files, results, errors)
-	}
-
-	for _, file := range audioFiles {
-		files <- file
-	}
-	close(files)
-
-	for i := 0; i < numJobs; i++ {
-		select {
-		case track := <-results:
-			tracks = append(tracks, track)
-		case err := <-errors:
-			return nil, err
-		}
-	}
-	return tracks, nil
-}
-
-func (p *Project) fileToTrackWorker(
-	files <-chan string,
-	tracks chan<- Track,
-	errors chan<- error,
-) {
-	for j := range files {
-		track, err := p.fileToTrack(j)
-		if err != nil {
-			errors <- err
-			return
-		}
-		tracks <- track
-	}
-}
-
-func (p *Project) fileToTrack(file string) (Track, error) {
-	metadata, tagOrder, err := p.getUpdatedFileMetadata(file)
-	if err != nil {
-		return Track{}, fmt.Errorf("could not read metadata for '%s': %w", file, err)
-	}
-	track := Track{File: file, Metadata: metadata, TagOrder: tagOrder}
-
-	if _, exists := track.DiscNumber(); !exists {
-		return Track{}, fmt.Errorf("track '%s' has no disc number", track.File)
-	}
-
-	return track, nil
 }
 
 func sortTracks(a, b Track) int {
@@ -423,7 +356,7 @@ func (p *Project) Chapters() (string, error) {
 	var previousChapter *Chapter
 
 	for i, track := range tracks {
-		title, duration, err := p.MetadataProvider.ReadTitleAndDuration(track.File)
+		title, duration, err := track.TitleAndDuration()
 		if err != nil {
 			return "", fmt.Errorf("could not read file data for file %s: %w", track, err)
 		}
@@ -546,25 +479,12 @@ func (p *Project) getUpdatedMetadata() (map[string]string, []string, error) {
 		return nil, nil, errors.New("no audio files found")
 	}
 
-	return audioFiles[0].Metadata, audioFiles[0].TagOrder, nil
-}
-
-func (p *Project) getUpdatedFileMetadata(file string) (map[string]string, []string, error) {
-	metadata, err := p.MetadataProvider.ReadMetadata(file)
+	metadata, tagOrder, err := audioFiles[0].Metadata()
 	if err != nil {
-		return nil, nil, fmt.Errorf("could not read metadata: %w", err)
+		return nil, nil, err
 	}
 
-	tags, tagOrder := p.getMetadataTags(metadata)
-
-	for _, rule := range p.Config.MetadataRules {
-		err = rule.Apply(tags)
-		if err != nil {
-			return nil, nil, err
-		}
-	}
-
-	return tags, tagOrder, nil
+	return metadata, tagOrder, nil
 }
 
 func (p *Project) m4aPath() (string, error) {
@@ -583,28 +503,4 @@ func (p *Project) m4aPath() (string, error) {
 
 func (p *Project) filelistFile() string {
 	return filepath.Join(p.workDir, "filelist.txt")
-}
-
-func (p *Project) getMetadataTags(metadata string) (map[string]string, []string) {
-	var tags = make(map[string]string)
-
-	lines := strings.Split(metadata, "\n")[1:]
-	tagOrder := make([]string, 0, len(lines))
-	for _, line := range lines {
-		split := strings.SplitN(line, "=", 2)
-		if len(split) < 1 {
-			continue
-		}
-
-		tagOrder = append(tagOrder, split[0])
-
-		if len(split) == 1 {
-			tags[split[0]] = ""
-			continue
-		}
-
-		tags[split[0]] = split[1]
-	}
-
-	return tags, tagOrder
 }
