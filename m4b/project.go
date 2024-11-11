@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 
@@ -102,6 +103,7 @@ func NewMultiProjectsFromPath(
 
 		projectConfig := *config
 		projectConfig.ProjectPath = filepath.Join(baseDir, dirEntry.Name())
+		projectConfig.outputPath = filepath.Join(baseDir, "out")
 
 		project, err := NewProject(projectConfig, audioProvider, audioProcessor, trackFactory)
 		if err != nil {
@@ -466,9 +468,20 @@ func (p *Project) Filename() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	filename := filepath.Join(p.Config.ProjectPath, artist, album+".m4b")
+
+	filename := filepath.Join(
+		p.Config.OutputPath(),
+		sanitizePathComponent(artist),
+		sanitizePathComponent(album)+".m4b",
+	)
 
 	return filename, nil
+}
+
+// sanitizePathComponent replaces unallowed symbols with _ from a path component
+func sanitizePathComponent(s string) string {
+	re := regexp.MustCompile(`[^a-zA-Z0-9 _-]`)
+	return re.ReplaceAllString(s, "_")
 }
 
 // ArtistAndBookTitle reads the metadata from the first track and returns the

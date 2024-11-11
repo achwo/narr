@@ -16,6 +16,7 @@ type ProjectConfig struct {
 	ChapterRules  []ChapterRule  `yaml:"chapterRules"`
 	ProjectPath   string         `yaml:"projectPath,omitempty"`
 	ShouldConvert bool           `yaml:"shouldConvert"`
+	outputPath    string         `yaml:"outputPath,omitempty"`
 }
 
 // Validate checks if the ProjectConfig is valid by ensuring required fields
@@ -46,4 +47,12 @@ func (c *ProjectConfig) FullAudioFilePath() (string, error) {
 		return "", fmt.Errorf("could not get absolute path %s, %w", c.ProjectPath, err)
 	}
 	return audioFilePath, nil
+}
+
+func (c *ProjectConfig) OutputPath() string {
+	if c.outputPath != "" {
+		return c.outputPath
+	}
+
+	return c.ProjectPath
 }

@@ -37,8 +37,8 @@ func TestMetadata(t *testing.T) {
 		t,
 		`;FFMETADATA1
 title=01 - Star dust
-artist=Hans Wurst read by George Washington
-album=The Book
+artist=Hans Wurst/ read by George Washington
+album=The Book?
 date=2002-09-16`,
 		metadata,
 	)
@@ -53,7 +53,7 @@ func TestFilename(t *testing.T) {
 	filename, err := project.Filename()
 	require.NoError(t, err)
 
-	require.Equal(t, "Hans Wurst read by George Washington/The Book.m4b", filename)
+	require.Equal(t, "Hans Wurst_ read by George Washington/The Book_.m4b", filename)
 }
 
 func TestTracks(t *testing.T) {
@@ -132,8 +132,8 @@ func setupProject() (*m4b.Project, error) {
 		Duration: 5000,
 		Metadata: `;FFMETADATA1
 title=Chapter 01-02: Star dust
-artist=Hans Wurst read by George Washington
-album=The Book
+artist=Hans Wurst/ read by George Washington
+album=The Book?
 track=1/16
 disc=1/10
 date=2002-09-16`,
@@ -143,8 +143,8 @@ date=2002-09-16`,
 		Duration: 5000,
 		Metadata: `;FFMETADATA1
 title=Chapter 01-02: Star dust
-artist=Hans Wurst read by George Washington
-album=The Book
+artist=Hans Wurst/ read by George Washington
+album=The Book?
 track=2/16
 disc=2/10
 date=2002-09-16`,
@@ -155,8 +155,8 @@ date=2002-09-16`,
 		Duration: 5000,
 		Metadata: `;FFMETADATA1
 title=Chapter 02-02: Wurst
-artist=Hans Wurst read by George Washington
-album=The Book
+artist=Hans Wurst/ read by George Washington
+album=The Book?
 track=3/16
 disc=2/10
 date=2002-09-16`,
