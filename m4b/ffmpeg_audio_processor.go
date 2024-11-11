@@ -20,7 +20,12 @@ type FFmpegAudioProcessor struct {
 // It takes a slice of input file paths and an output directory path
 // Returns a slice of converted file paths or an error
 func (p *FFmpegAudioProcessor) ToM4A(files []string, outputPath string) ([]string, error) {
-	outputFiles := make([]string, 0, len(files))
+	outInOrder := make([]string, 0, len(files))
+
+	for _, file := range files {
+		fileName := filepath.Base(file)
+		outInOrder = append(outInOrder, path.Join(outputPath, fileName))
+	}
 
 	const numWorkers = 5
 
@@ -41,30 +46,15 @@ func (p *FFmpegAudioProcessor) ToM4A(files []string, outputPath string) ([]strin
 
 	for i := 0; i < len(files); i++ {
 		select {
-		case m4a := <-out:
-			outputFiles = append(outputFiles, m4a)
+		case <-out:
 			fmt.Print(".")
 		case err := <-errs:
 			return nil, fmt.Errorf("could not convert track: %w", err)
 		}
 	}
 
-	// for _, file := range files {
-	// 	fileName := filepath.Base(file)
-	// 	out := path.Join(outputPath, fileName)
-	// 	outputFiles = append(outputFiles, out)
-	// 	cmd := p.Command.Create("ffmpeg", "-i", file, "-c", "copy", "-c:a", "aac_at", out)
-	//
-	// 	var outBuf bytes.Buffer
-	// 	err := cmd.Run(&outBuf, &outBuf)
-	// 	if err != nil {
-	// 		fmt.Println(outBuf.String())
-	// 		return nil, fmt.Errorf("could not convert file %s:, %w", out, err)
-	// 	}
-	// 	fmt.Print(".")
-	// }
 	fmt.Println()
-	return outputFiles, nil
+	return outInOrder, nil
 }
 
 func (p *FFmpegAudioProcessor) convertToM4AWorker(
@@ -94,7 +84,8 @@ func (p *FFmpegAudioProcessor) convertToM4AWorker(
 // It takes input files, a temporary filelist path, and an output directory
 // Returns the path to the concatenated file or an error
 func (p *FFmpegAudioProcessor) Concat(files []string, filelistFile string, outputPath string) (string, error) {
-	err := os.WriteFile(filelistFile, []byte(p.filelistFileContent(files)), 0600)
+	fileListContent := p.filelistFileContent(files)
+	err := os.WriteFile(filelistFile, []byte(fileListContent), 0600)
 	if err != nil {
 		return "", fmt.Errorf("could not write filelist file: %w", err)
 	}
