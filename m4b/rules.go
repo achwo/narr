@@ -69,8 +69,8 @@ func (r *MetadataRule) Validate() error {
 			return errors.New("set rule cannot have regex or format")
 		}
 	case "regex":
-		if r.Regex == "" || r.Format == "" {
-			return errors.New("regex rule requires both regex and format")
+		if r.Regex == "" {
+			return errors.New("regex rule requires both regex")
 		}
 		if r.Value != "" {
 			return errors.New("regex rule cannot have value")
