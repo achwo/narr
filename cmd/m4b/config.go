@@ -69,7 +69,7 @@ var checkCmd = &cobra.Command{
 		}
 
 		for _, project := range projects {
-			fmt.Printf("\n# Project %s\n", path)
+			fmt.Printf("\n# Project %s\n", project.Config.ProjectPath)
 			fmt.Println("## Tracks")
 			tracks, err := project.Tracks()
 			if err != nil {
