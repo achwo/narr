@@ -3,6 +3,8 @@ package utils
 import (
 	"regexp"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestApplyRegex(t *testing.T) {
@@ -42,6 +44,23 @@ func TestApplyRegex(t *testing.T) {
 			if got != tt.expected {
 				t.Errorf("GetMetadataField() = %v, expected %v", got, tt.expected)
 			}
+		})
+	}
+}
+
+func TestSanitizePathComponent(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{name: "does not replace .", input: "J.R.R. Tolkien", expected: "J.R.R. Tolkien"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := SanitizePathComponent(tt.input)
+			require.Equal(t, tt.expected, result)
 		})
 	}
 }

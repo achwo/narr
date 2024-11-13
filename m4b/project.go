@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
 	"slices"
 	"strings"
 
@@ -453,17 +452,11 @@ func (p *Project) Filename() (string, error) {
 
 	filename := filepath.Join(
 		p.Config.OutputPath(),
-		sanitizePathComponent(artist),
-		sanitizePathComponent(album)+".m4b",
+		utils.SanitizePathComponent(artist),
+		utils.SanitizePathComponent(album)+".m4b",
 	)
 
 	return filename, nil
-}
-
-// sanitizePathComponent replaces unallowed symbols with _ from a path component
-func sanitizePathComponent(s string) string {
-	re := regexp.MustCompile(`[^a-zA-Z0-9 _-]`)
-	return re.ReplaceAllString(s, "_")
 }
 
 // ArtistAndBookTitle reads the metadata from the first track and returns the
