@@ -19,7 +19,6 @@ const configFileName = "narr.yaml"
 func NewProjectsByArgs(
 	path string,
 	recursive bool,
-	multi bool,
 	audioProvider AudioFileProvider,
 	audioProcessor AudioProcessor,
 	trackFactory TrackFactory,
@@ -29,12 +28,8 @@ func NewProjectsByArgs(
 	var err error
 	if recursive {
 		projects, err = NewRecursiveProjectsFromPath(path, audioProvider, audioProcessor, trackFactory)
-	} else if multi {
-		projects, err = NewMultiProjectsFromPath(path, audioProvider, audioProcessor, trackFactory)
 	} else {
-		var project *Project
-		project, err = NewProjectFromPath(path, audioProvider, audioProcessor, trackFactory)
-		projects = append(projects, project)
+		projects, err = NewProjectsFromPath(path, audioProvider, audioProcessor, trackFactory)
 	}
 
 	if err != nil {
@@ -58,17 +53,21 @@ func NewRecursiveProjectsFromPath(
 	var projects []*Project
 
 	for _, config := range projectConfigs {
-		project, err := NewProjectFromPath(config, audioProvider, audioProcessor, trackFactory)
+		project, err := NewProjectsFromPath(config, audioProvider, audioProcessor, trackFactory)
 		if err != nil {
 			return nil, fmt.Errorf("could not create project for path '%s': %w", config, err)
 		}
-		projects = append(projects, project)
+		projects = slices.Concat(projects, project)
 	}
 
 	return projects, nil
 }
 
-func NewMultiProjectsFromPath(
+// NewProjectsFromPath returns a slice of Projects
+// Depending on the config it might be:
+// - a single Project
+// - multiple Projects (when config Multi is true)
+func NewProjectsFromPath(
 	path string,
 	audioProvider AudioFileProvider,
 	audioProcessor AudioProcessor,
@@ -82,66 +81,49 @@ func NewMultiProjectsFromPath(
 		fullpath = filepath.Join(path, configFileName)
 	}
 
-	baseDir := filepath.Dir(fullpath)
-
-	projectDirEntries, err := os.ReadDir(baseDir)
-	if err != nil {
-		return nil, fmt.Errorf("could not get multi project directories: %w", err)
-	}
-
-	var projects []*Project
-
 	config, err := readConfig(fullpath)
 	if err != nil {
 		return nil, fmt.Errorf("could not read config file %s: %w", fullpath, err)
 	}
 
-	for _, dirEntry := range projectDirEntries {
-		if !dirEntry.IsDir() {
-			continue
-		}
-
-		projectConfig := *config
-		projectConfig.ProjectPath = filepath.Join(baseDir, dirEntry.Name())
-		projectConfig.outputPath = filepath.Join(baseDir, "out")
-
-		project, err := NewProject(projectConfig, audioProvider, audioProcessor, trackFactory)
+	if config.Multi {
+		baseDir := filepath.Dir(fullpath)
+		projectDirEntries, err := os.ReadDir(baseDir)
 		if err != nil {
-			return nil, fmt.Errorf("could not create project for path '%s': %w", dirEntry, err)
+			return nil, fmt.Errorf("could not get multi project directories: %w", err)
 		}
 
-		projects = append(projects, project)
-	}
+		var projects []*Project
 
-	return projects, nil
-}
+		for _, dirEntry := range projectDirEntries {
+			if !dirEntry.IsDir() {
+				continue
+			}
 
-// NewProjectFromPath creates a new Project from a configuration file at the given path.
-// It reads and parses the narr.yaml configuration file and initializes the project with the
-// provided audio file provider, metadata provider, and audio converter.
-// Returns an error if the configuration file cannot be read or parsed.
-func NewProjectFromPath(
-	path string,
-	audioProvider AudioFileProvider,
-	audioConverter AudioProcessor,
-	trackFactory TrackFactory,
-) (*Project, error) {
-	var fullpath string
+			projectConfig := *config
+			projectConfig.ProjectPath = filepath.Join(baseDir, dirEntry.Name())
+			projectConfig.outputPath = filepath.Join(baseDir, "out")
 
-	if strings.HasSuffix(path, configFileName) {
-		fullpath = path
+			project, err := NewProject(projectConfig, audioProvider, audioProcessor, trackFactory)
+			if err != nil {
+				return nil, fmt.Errorf("could not create project for path '%s': %w", dirEntry, err)
+			}
+
+			projects = append(projects, project)
+		}
+
+		return projects, nil
+
 	} else {
-		fullpath = filepath.Join(path, configFileName)
+		config.ProjectPath = filepath.Dir(fullpath)
+
+		project, err := NewProject(*config, audioProvider, audioProcessor, trackFactory)
+		if err != nil {
+			return nil, err
+		}
+
+		return []*Project{project}, nil
 	}
-
-	config, err := readConfig(fullpath)
-	if err != nil {
-		return nil, err
-	}
-
-	config.ProjectPath = filepath.Dir(fullpath)
-
-	return NewProject(*config, audioProvider, audioConverter, trackFactory)
 }
 
 func readConfig(fullpath string) (*ProjectConfig, error) {

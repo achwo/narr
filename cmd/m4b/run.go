@@ -1,7 +1,6 @@
 package m4b
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/achwo/narr/m4b"
@@ -14,11 +13,6 @@ var runCmd = &cobra.Command{
 	Short: "Convert to m4b",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		recursive, _ := cmd.Flags().GetBool("recursive")
-		multi, _ := cmd.Flags().GetBool("multi")
-
-		if recursive && multi {
-			return errors.New("cannot run both recursive and multi at the same time")
-		}
 
 		path, err := utils.GetValidFullpathFromArgs(args, 0)
 		if err != nil {
@@ -28,7 +22,6 @@ var runCmd = &cobra.Command{
 		projects, err := m4b.NewProjectsByArgs(
 			path,
 			recursive,
-			multi,
 			audioFileProvider,
 			audioProcessor,
 			trackFactory,

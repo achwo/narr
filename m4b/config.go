@@ -14,8 +14,9 @@ type ProjectConfig struct {
 	HasChapters   bool           `yaml:"hasChapters"`
 	MetadataRules []MetadataRule `yaml:"metadataRules"`
 	ChapterRules  []ChapterRule  `yaml:"chapterRules"`
-	ProjectPath   string         `yaml:"projectPath,omitempty"`
 	ShouldConvert bool           `yaml:"shouldConvert"`
+	Multi         bool           `yaml:"multi"`
+	ProjectPath   string         `yaml:"projectPath,omitempty"`
 	outputPath    string         `yaml:"outputPath,omitempty"`
 }
 
