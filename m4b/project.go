@@ -453,6 +453,7 @@ func (p *Project) Filename() (string, error) {
 	filename := filepath.Join(
 		p.Config.OutputPath(),
 		utils.SanitizePathComponent(artist),
+		utils.SanitizePathComponent(album),
 		utils.SanitizePathComponent(album)+".m4b",
 	)
 

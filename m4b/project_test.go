@@ -53,7 +53,7 @@ func TestFilename(t *testing.T) {
 	filename, err := project.Filename()
 	require.NoError(t, err)
 
-	require.Equal(t, "Hans Wurst_ read by George Washington/The Book_.m4b", filename)
+	require.Equal(t, "Hans Wurst_ read by George Washington/The Book_/The Book_.m4b", filename)
 }
 
 func TestTracks(t *testing.T) {
