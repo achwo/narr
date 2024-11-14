@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"slices"
@@ -213,6 +214,15 @@ func (p *Project) ConvertToM4B() (string, error) {
 		return "", fmt.Errorf("could not load audio files: %w", err)
 	}
 
+	finalFilename, err := p.Filename()
+	if err != nil {
+		return "", fmt.Errorf("could not get filename: %w", err)
+	}
+
+	if completed := p.AlreadyCompleted(); completed {
+		fmt.Println("Skipping, as already completed")
+		return finalFilename, nil
+	}
 	files := make([]string, 0, len(tracks))
 
 	for _, track := range tracks {
@@ -274,11 +284,6 @@ func (p *Project) ConvertToM4B() (string, error) {
 	fmt.Println("Adding chapters to m4b")
 	if err = p.AudioProcessor.AddChapters(m4bFile, chapters); err != nil {
 		return "", fmt.Errorf("could not add chapters to %s: %w", m4bFile, err)
-	}
-
-	finalFilename, err := p.Filename()
-	if err != nil {
-		return "", fmt.Errorf("could not get filename: %w", err)
 	}
 
 	if err = os.MkdirAll(filepath.Dir(finalFilename), 0755); err != nil {
@@ -525,4 +530,35 @@ func (p *Project) m4aPath() (string, error) {
 
 func (p *Project) filelistFile() string {
 	return filepath.Join(p.workDir, "filelist.txt")
+}
+
+func (p *Project) AlreadyCompleted() bool {
+	tracks, err := p.Tracks()
+	if err != nil {
+		return false
+	}
+
+	total := 0.0
+
+	for _, track := range tracks {
+		total = total + track.duration
+	}
+
+	outputFile, err := p.Filename()
+	if err != nil {
+		return false
+	}
+
+	if _, err := os.Stat(outputFile); err != nil {
+		return false
+	}
+
+	outputTrack, err := p.TrackFactory.LoadTrack(outputFile, nil)
+	if err != nil {
+		return false
+	}
+
+	difference := math.Abs(outputTrack.duration - total)
+	threshold := total * 0.05
+	return difference <= threshold
 }
