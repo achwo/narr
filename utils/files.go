@@ -2,7 +2,6 @@
 package utils
 
 import (
-	"errors"
 	"fmt"
 	"io/fs"
 	"os"
@@ -62,7 +61,12 @@ func GetValidDirPathFromArgs(args []string, index int) (string, error) {
 // It returns an error if the index is out of bounds or the path conversion fails.
 func GetValidFullpathFromArgs(args []string, index int) (string, error) {
 	if len(args) < index+1 {
-		return "", errors.New("you must specify a path")
+		ex, err := os.Getwd()
+		if err != nil {
+			return "", fmt.Errorf("failed to get current path: %w", err)
+		}
+
+		return ex, nil
 	}
 
 	path := args[0]
