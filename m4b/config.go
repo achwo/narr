@@ -4,6 +4,7 @@ package m4b
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 )
 
@@ -54,6 +55,11 @@ func (c *ProjectConfig) OutputPath() string {
 	if c.outputPath != "" {
 		return c.outputPath
 	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		panic("Could not get user home dir")
+	}
 
-	return c.ProjectPath
+	c.outputPath = filepath.Join(home, "narr")
+	return c.outputPath
 }

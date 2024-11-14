@@ -1,6 +1,8 @@
 package m4b_test
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/achwo/narr/m4b"
@@ -53,7 +55,10 @@ func TestFilename(t *testing.T) {
 	filename, err := project.Filename()
 	require.NoError(t, err)
 
-	require.Equal(t, "Hans Wurst_ read by George Washington/The Book_/The Book_.m4b", filename)
+	home, err := os.UserHomeDir()
+	require.NoError(t, err)
+
+	require.Equal(t, filepath.Join(home, "narr", "Hans Wurst_ read by George Washington/The Book_/The Book_.m4b"), filename)
 }
 
 func TestTracks(t *testing.T) {

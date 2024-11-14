@@ -102,7 +102,6 @@ func NewProjectsFromPath(
 
 			projectConfig := *config
 			projectConfig.ProjectPath = filepath.Join(baseDir, dirEntry.Name())
-			projectConfig.outputPath = filepath.Join(baseDir, "out")
 
 			project, err := NewProject(projectConfig, audioProvider, audioProcessor, trackFactory)
 			if err != nil {
