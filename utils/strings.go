@@ -49,6 +49,6 @@ func ApplyRegex(input string, regex *regexp.Regexp, format string) (string, erro
 
 // SanitizePathComponent replaces unallowed symbols with _ from a path component
 func SanitizePathComponent(s string) string {
-	re := regexp.MustCompile(`[^a-zA-Z0-9 _.-]`)
+	re := regexp.MustCompile(`[^a-zA-Z0-9 _.\-?]`)
 	return re.ReplaceAllString(s, "_")
 }

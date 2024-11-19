@@ -55,6 +55,7 @@ func TestSanitizePathComponent(t *testing.T) {
 		expected string
 	}{
 		{name: "does not replace .", input: "J.R.R. Tolkien", expected: "J.R.R. Tolkien"},
+		{name: "does not replace ?", input: "Something With ???", expected: "Something With ???"},
 	}
 
 	for _, tt := range tests {
