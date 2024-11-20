@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 )
 
@@ -14,7 +15,7 @@ type OSAudioFileProvider struct{}
 
 // AudioFiles returns a list of M4A audio files found at the given path
 func (p *OSAudioFileProvider) AudioFiles(fullPath string) ([]string, error) {
-	return GetFilesByExtension(fullPath, ".m4a")
+	return GetFilesByExtensions(fullPath, []string{".m4a", ".mp3"})
 }
 
 // GetValidFilePathFromArgs retrieves and validates a file path from command line arguments.
@@ -78,23 +79,24 @@ func GetValidFullpathFromArgs(args []string, index int) (string, error) {
 	return fullpath, nil
 }
 
-// GetFilesByExtension walks through a directory tree and returns all files with the specified extension.
+// GetFilesByExtensions walks through a directory tree and returns all files with any of the
+// specified extensions.
 // It returns an error if there are any issues accessing the filesystem during the walk.
-func GetFilesByExtension(fullpath string, extension string) ([]string, error) {
-	var m4bFiles []string
+func GetFilesByExtensions(fullpath string, extensions []string) ([]string, error) {
+	var files []string
 
 	err := filepath.WalkDir(fullpath, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return fmt.Errorf("failed to access %s: %w", path, err)
 		}
 
-		if filepath.Ext(path) == extension {
-			m4bFiles = append(m4bFiles, path)
+		if slices.Contains(extensions, filepath.Ext(path)) {
+			files = append(files, path)
 		}
 		return nil
 	})
 
-	return m4bFiles, err
+	return files, err
 }
 
 func GetAllFilesByName(basepath string, name string) ([]string, error) {

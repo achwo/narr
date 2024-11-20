@@ -21,7 +21,7 @@ var showCmd = &cobra.Command{
 			return fmt.Errorf("could not resolve path %s: %w", args[0], err)
 		}
 
-		files, err := utils.GetFilesByExtension(path, ".m4b")
+		files, err := utils.GetFilesByExtensions(path, []string{".m4b"})
 		if err != nil {
 			return fmt.Errorf("failed to read files within %s: %w", path, err)
 		}

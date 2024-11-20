@@ -2,6 +2,8 @@ package utils
 
 import (
 	"fmt"
+	"path"
+	"path/filepath"
 	"regexp"
 	"strings"
 )
@@ -51,4 +53,10 @@ func ApplyRegex(input string, regex *regexp.Regexp, format string) (string, erro
 func SanitizePathComponent(s string) string {
 	re := regexp.MustCompile(`[^a-zA-Z0-9 _.\-?]`)
 	return re.ReplaceAllString(s, "_")
+}
+
+func ReplaceDirAndExt(file string, dir string, ext string) string {
+	fileName := filepath.Base(file)
+	fileName = strings.TrimSuffix(fileName, filepath.Ext(file)) + ".m4a"
+	return path.Join(dir, fileName)
 }

@@ -30,7 +30,7 @@ var editCmd = &cobra.Command{
 			return fmt.Errorf("error compiling regex: %w", err)
 		}
 
-		files, err := utils.GetFilesByExtension(path, ".m4b")
+		files, err := utils.GetFilesByExtensions(path, []string{".m4b"})
 		if err != nil {
 			return fmt.Errorf("could not get files: %w", err)
 		}

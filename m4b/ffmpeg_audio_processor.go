@@ -4,11 +4,12 @@ import (
 	"bytes"
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/achwo/narr/utils"
 )
 
 // FFmpegAudioProcessor handles audio file processing operations using FFmpeg
@@ -23,8 +24,8 @@ func (p *FFmpegAudioProcessor) ToM4A(files []string, outputPath string) ([]strin
 	outInOrder := make([]string, 0, len(files))
 
 	for _, file := range files {
-		fileName := filepath.Base(file)
-		outInOrder = append(outInOrder, path.Join(outputPath, fileName))
+		outFile := utils.ReplaceDirAndExt(file, outputPath, ".m4a")
+		outInOrder = append(outInOrder, outFile)
 	}
 
 	const numWorkers = 5
@@ -64,8 +65,7 @@ func (p *FFmpegAudioProcessor) convertToM4AWorker(
 	outputPath string,
 ) {
 	for file := range in {
-		fileName := filepath.Base(file)
-		outFile := path.Join(outputPath, fileName)
+		outFile := utils.ReplaceDirAndExt(file, outputPath, ".m4a")
 		cmd := p.Command.Create("ffmpeg", "-i", file, "-c", "copy", "-c:a", "aac_at", outFile)
 
 		var outBuf bytes.Buffer
