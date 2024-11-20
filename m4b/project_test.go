@@ -10,10 +10,10 @@ import (
 )
 
 func TestShowChapters(t *testing.T) {
-	project, err := setupProject()
-	if err != nil {
-		t.Fatal(err)
-	}
+	config := m4b.ProjectConfig{ChapterRules: []m4b.ChapterRule{}}
+	deps := setupDeps()
+	project, err := m4b.NewProjectWithDeps(config, *deps)
+	require.NoError(t, err)
 
 	chapters, err := project.Chapters()
 	require.NoError(t, err)
@@ -28,8 +28,10 @@ func TestMetadata(t *testing.T) {
 		Regex:  "^Chapter (\\d+)-\\d+: (.+)$",
 		Format: "%s - %s",
 	}
-	project, err := setupProject()
-	project.Config.MetadataRules = append(project.Config.MetadataRules, metadataRule)
+	config := m4b.ProjectConfig{ChapterRules: []m4b.ChapterRule{}}
+	config.MetadataRules = append(config.MetadataRules, metadataRule)
+
+	project, err := m4b.NewProjectWithDeps(config, *setupDeps())
 	require.NoError(t, err)
 
 	metadata, err := project.Metadata()
@@ -47,10 +49,10 @@ date=2002-09-16`,
 }
 
 func TestFilename(t *testing.T) {
-	project, err := setupProject()
-	if err != nil {
-		t.Fatal(err)
-	}
+	config := m4b.ProjectConfig{ChapterRules: []m4b.ChapterRule{}}
+	deps := setupDeps()
+	project, err := m4b.NewProjectWithDeps(config, *deps)
+	require.NoError(t, err)
 
 	filename, err := project.Filename()
 	require.NoError(t, err)
@@ -62,13 +64,7 @@ func TestFilename(t *testing.T) {
 }
 
 func TestTracks(t *testing.T) {
-	// should return all files within the project folder sorted by cd and track numbers
-	project, err := setupProject()
-
-	fakeAudioProvider := &FakeAudioFileProvider{
-		Files: []string{"file1.m4a", "file2.m4a", "file3.m4a"},
-	}
-
+	config := m4b.ProjectConfig{ChapterRules: []m4b.ChapterRule{}}
 	data := make(map[string]m4b.FileData)
 
 	data["file1.m4a"] = m4b.FileData{
@@ -108,13 +104,17 @@ date=2002-09-16`,
 	}
 
 	fakeAudioProcessor := &m4b.NullAudioProcessor{Data: data}
-	project.AudioProcessor = fakeAudioProcessor
-	project.AudioFileProvider = fakeAudioProvider
-	project.TrackFactory = &m4b.FFmpegTrackFactory{AudioProcessor: fakeAudioProcessor}
 
-	if err != nil {
-		t.Fatal(err)
+	deps := m4b.ProjectDependencies{
+		AudioFileProvider: &FakeAudioFileProvider{
+			Files: []string{"file1.m4a", "file2.m4a", "file3.m4a"},
+		},
+		AudioProcessor: fakeAudioProcessor,
+		TrackFactory:   &m4b.FFmpegTrackFactory{AudioProcessor: fakeAudioProcessor},
 	}
+
+	project, err := m4b.NewProjectWithDeps(config, deps)
+	require.NoError(t, err)
 
 	files, err := project.Tracks()
 	require.NoError(t, err)
@@ -125,11 +125,7 @@ date=2002-09-16`,
 
 }
 
-func setupProject() (*m4b.Project, error) {
-	fakeAudioProvider := &FakeAudioFileProvider{
-		Files: []string{"file1.m4a", "file2.m4a"},
-	}
-
+func setupDeps() *m4b.ProjectDependencies {
 	data := make(map[string]m4b.FileData)
 
 	data["file1.m4a"] = m4b.FileData{
@@ -169,10 +165,15 @@ date=2002-09-16`,
 
 	fakeAudioProcessor := &m4b.NullAudioProcessor{Data: data}
 	trackFactory := &m4b.FFmpegTrackFactory{AudioProcessor: fakeAudioProcessor}
+	fakeAudioProvider := &FakeAudioFileProvider{
+		Files: []string{"file1.m4a", "file2.m4a"},
+	}
 
-	config := m4b.ProjectConfig{ChapterRules: []m4b.ChapterRule{}}
-
-	return m4b.NewProject(config, fakeAudioProvider, fakeAudioProcessor, trackFactory)
+	return &m4b.ProjectDependencies{
+		AudioFileProvider: fakeAudioProvider,
+		AudioProcessor:    fakeAudioProcessor,
+		TrackFactory:      trackFactory,
+	}
 }
 
 // FakeAudioFileProvider implements a test double for providing audio files

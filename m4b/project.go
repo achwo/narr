@@ -16,20 +16,14 @@ import (
 
 const configFileName = "narr.yaml"
 
-func NewProjectsByArgs(
-	path string,
-	recursive bool,
-	audioProvider AudioFileProvider,
-	audioProcessor AudioProcessor,
-	trackFactory TrackFactory,
-) ([]*Project, error) {
+func NewProjectsByArgs(path string, recursive bool) ([]*Project, error) {
 	var projects []*Project
 
 	var err error
 	if recursive {
-		projects, err = NewRecursiveProjectsFromPath(path, audioProvider, audioProcessor, trackFactory)
+		projects, err = NewRecursiveProjectsFromPath(path)
 	} else {
-		projects, err = NewProjectsFromPath(path, audioProvider, audioProcessor, trackFactory)
+		projects, err = NewProjectsFromPath(path)
 	}
 
 	if err != nil {
@@ -39,12 +33,7 @@ func NewProjectsByArgs(
 	return projects, nil
 }
 
-func NewRecursiveProjectsFromPath(
-	path string,
-	audioProvider AudioFileProvider,
-	audioProcessor AudioProcessor,
-	trackFactory TrackFactory,
-) ([]*Project, error) {
+func NewRecursiveProjectsFromPath(path string) ([]*Project, error) {
 	projectConfigs, err := utils.GetAllFilesByName(path, "narr.yaml")
 	if err != nil {
 		return nil, fmt.Errorf("could not get project directories: %w", err)
@@ -53,7 +42,7 @@ func NewRecursiveProjectsFromPath(
 	var projects []*Project
 
 	for _, config := range projectConfigs {
-		project, err := NewProjectsFromPath(config, audioProvider, audioProcessor, trackFactory)
+		project, err := NewProjectsFromPath(config)
 		if err != nil {
 			return nil, fmt.Errorf("could not create project for path '%s': %w", config, err)
 		}
@@ -67,12 +56,7 @@ func NewRecursiveProjectsFromPath(
 // Depending on the config it might be:
 // - a single Project
 // - multiple Projects (when config Multi is true)
-func NewProjectsFromPath(
-	path string,
-	audioProvider AudioFileProvider,
-	audioProcessor AudioProcessor,
-	trackFactory TrackFactory,
-) ([]*Project, error) {
+func NewProjectsFromPath(path string) ([]*Project, error) {
 	var fullpath string
 
 	if strings.HasSuffix(path, configFileName) {
@@ -103,7 +87,7 @@ func NewProjectsFromPath(
 			projectConfig := *config
 			projectConfig.ProjectPath = filepath.Join(baseDir, dirEntry.Name())
 
-			project, err := NewProject(projectConfig, audioProvider, audioProcessor, trackFactory)
+			project, err := NewProject(projectConfig)
 			if err != nil {
 				return nil, fmt.Errorf("could not create project for path '%s': %w", dirEntry, err)
 			}
@@ -116,7 +100,7 @@ func NewProjectsFromPath(
 	} else {
 		config.ProjectPath = filepath.Dir(fullpath)
 
-		project, err := NewProject(*config, audioProvider, audioProcessor, trackFactory)
+		project, err := NewProject(*config)
 		if err != nil {
 			return nil, err
 		}
@@ -140,37 +124,42 @@ func readConfig(fullpath string) (*ProjectConfig, error) {
 	return &config, nil
 }
 
-// NewProject creates a new Project with the given configuration and providers.
+// NewProjectWithDeps creates a new Project with the given configuration and providers.
 // It validates the configuration before creating the project.
 // Returns an error if the configuration is invalid.
-func NewProject(
-	config ProjectConfig,
-	audioProvider AudioFileProvider,
-	audioConverter AudioProcessor,
-	trackFactory TrackFactory,
-) (*Project, error) {
+func NewProjectWithDeps(config ProjectConfig, deps ProjectDependencies) (*Project, error) {
 	err := config.Validate()
 	if err != nil {
 		return nil, err
 	}
 
-	return &Project{
-		Config:            config,
-		AudioFileProvider: audioProvider,
-		AudioProcessor:    audioConverter,
-		TrackFactory:      trackFactory,
-	}, nil
+	return &Project{Config: config, deps: deps}, nil
 }
 
-// AudioFileProvider defines the interface for providing audio files from a directory.
-type AudioFileProvider interface {
+// NewProject creates a new Project with the given configuration.
+// It validates the configuration before creating the project.
+// Returns an error if the configuration is invalid.
+func NewProject(config ProjectConfig) (*Project, error) {
+	audioFileProvider := &utils.OSAudioFileProvider{}
+	audioProcessor := &FFmpegAudioProcessor{Command: &ExecCommand{}}
+	trackFactory := &FFmpegTrackFactory{AudioProcessor: audioProcessor}
+
+	deps := ProjectDependencies{
+		AudioFileProvider: audioFileProvider,
+		AudioProcessor:    audioProcessor,
+		TrackFactory:      trackFactory,
+	}
+	return NewProjectWithDeps(config, deps)
+}
+
+// audioFileProvider defines the interface for providing audio files from a directory.
+type audioFileProvider interface {
 	AudioFiles(fullPath string) ([]string, error)
 }
 
-// AudioProcessor defines the interface for processing audio files, including
+// audioProcessor defines the interface for processing audio files, including
 // conversion, concatenation, and metadata manipulation operations.
-type AudioProcessor interface {
-	ToM4A(files []string, outputPath string) ([]string, error)
+type audioProcessor interface {
 	Concat(m4aFiles []string, templateFilePath string, outputPath string) (string, error)
 	AddMetadata(m4bFile string, metadata string, bookTitle string) error
 	AddCover(m4bFile string, coverFile string) error
@@ -178,9 +167,10 @@ type AudioProcessor interface {
 	AddChapters(m4bFile string, chapters string) error
 	ReadTitleAndDuration(file string) (string, float64, error)
 	ReadMetadata(file string) (string, error)
+	ToM4A(files []string, outputPath string) ([]string, error)
 }
 
-type TrackFactory interface {
+type trackFactory interface {
 	LoadTracks(file []string, metadataRules []MetadataRule) ([]Track, error)
 	LoadTrack(file string, metadataRules []MetadataRule) (Track, error)
 }
@@ -189,12 +179,16 @@ type TrackFactory interface {
 // It contains configuration, providers for audio files and metadata, and an audio processor
 // for handling audio file conversions and manipulations.
 type Project struct {
-	Config            ProjectConfig
-	AudioFileProvider AudioFileProvider
-	AudioProcessor    AudioProcessor
-	TrackFactory      TrackFactory
-	tracks            []Track
-	workDir           string
+	Config  ProjectConfig
+	tracks  []Track
+	workDir string
+	deps    ProjectDependencies
+}
+
+type ProjectDependencies struct {
+	AudioFileProvider audioFileProvider
+	AudioProcessor    audioProcessor
+	TrackFactory      trackFactory
 }
 
 // ConvertToM4B processes all audio files in the project and creates a single M4B audiobook file.
@@ -242,7 +236,7 @@ func (p *Project) ConvertToM4B() (string, error) {
 			return "", fmt.Errorf("could not create m4a path: %w", err)
 		}
 
-		m4aFiles, err = p.AudioProcessor.ToM4A(files, m4aPath)
+		m4aFiles, err = p.deps.AudioProcessor.ToM4A(files, m4aPath)
 
 		if err != nil {
 			return "", fmt.Errorf("could not convert files to m4a: %w", err)
@@ -250,7 +244,7 @@ func (p *Project) ConvertToM4B() (string, error) {
 	}
 
 	fmt.Println("Concating files")
-	m4bFile, err := p.AudioProcessor.Concat(m4aFiles, p.filelistFile(), p.workDir)
+	m4bFile, err := p.deps.AudioProcessor.Concat(m4aFiles, p.filelistFile(), p.workDir)
 	if err != nil {
 		return "", fmt.Errorf("could not concat files: %w", err)
 	}
@@ -266,7 +260,7 @@ func (p *Project) ConvertToM4B() (string, error) {
 		return "", fmt.Errorf("could not read book title: %w", err)
 	}
 
-	if err = p.AudioProcessor.AddMetadata(m4bFile, metadata, bookTitle); err != nil {
+	if err = p.deps.AudioProcessor.AddMetadata(m4bFile, metadata, bookTitle); err != nil {
 		return "", fmt.Errorf("could not add metadata to %s: %w", m4bFile, err)
 	}
 
@@ -276,12 +270,12 @@ func (p *Project) ConvertToM4B() (string, error) {
 	}
 
 	fmt.Println("Adding cover to m4b")
-	if err = p.AudioProcessor.AddCover(m4bFile, cover); err != nil {
+	if err = p.deps.AudioProcessor.AddCover(m4bFile, cover); err != nil {
 		return "", fmt.Errorf("could not add cover to %s: %w", m4bFile, err)
 	}
 
 	fmt.Println("Adding chapters to m4b")
-	if err = p.AudioProcessor.AddChapters(m4bFile, chapters); err != nil {
+	if err = p.deps.AudioProcessor.AddChapters(m4bFile, chapters); err != nil {
 		return "", fmt.Errorf("could not add chapters to %s: %w", m4bFile, err)
 	}
 
@@ -314,7 +308,7 @@ func (p *Project) Cover() (string, error) {
 		return "", err
 	}
 	firstFile := tracks[0].File
-	return p.AudioProcessor.ExtractCover(firstFile, p.workDir)
+	return p.deps.AudioProcessor.ExtractCover(firstFile, p.workDir)
 }
 
 // Tracks returns a sorted list of all audio tracks in the project.
@@ -330,12 +324,12 @@ func (p *Project) Tracks() ([]Track, error) {
 		return nil, err
 	}
 
-	audioFiles, err := p.AudioFileProvider.AudioFiles(fullpath)
+	audioFiles, err := p.deps.AudioFileProvider.AudioFiles(fullpath)
 	if err != nil {
 		return nil, err
 	}
 
-	tracks, err := p.TrackFactory.LoadTracks(audioFiles, p.Config.MetadataRules)
+	tracks, err := p.deps.TrackFactory.LoadTracks(audioFiles, p.Config.MetadataRules)
 	if err != nil {
 		return nil, err
 	}
@@ -552,7 +546,7 @@ func (p *Project) AlreadyCompleted() bool {
 		return false
 	}
 
-	outputTrack, err := p.TrackFactory.LoadTrack(outputFile, nil)
+	outputTrack, err := p.deps.TrackFactory.LoadTrack(outputFile, nil)
 	if err != nil {
 		return false
 	}

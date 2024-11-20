@@ -19,13 +19,7 @@ var runCmd = &cobra.Command{
 			return fmt.Errorf("could not resolve path %s: %w", args[0], err)
 		}
 
-		projects, err := m4b.NewProjectsByArgs(
-			path,
-			recursive,
-			audioFileProvider,
-			audioProcessor,
-			trackFactory,
-		)
+		projects, err := m4b.NewProjectsByArgs(path, recursive)
 
 		if err != nil {
 			return fmt.Errorf("could not create project(s): %w", err)

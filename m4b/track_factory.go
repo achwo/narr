@@ -3,7 +3,7 @@ package m4b
 import "fmt"
 
 type FFmpegTrackFactory struct {
-	AudioProcessor AudioProcessor
+	AudioProcessor audioProcessor
 }
 
 func (t *FFmpegTrackFactory) LoadTracks(

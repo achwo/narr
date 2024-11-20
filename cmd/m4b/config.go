@@ -11,12 +11,6 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-var audioFileProvider m4b.AudioFileProvider = &utils.OSAudioFileProvider{}
-var audioProcessor m4b.AudioProcessor = &m4b.FFmpegAudioProcessor{
-	Command: &m4b.ExecCommand{},
-}
-var trackFactory m4b.TrackFactory = &m4b.FFmpegTrackFactory{AudioProcessor: audioProcessor}
-
 var generateCmd = &cobra.Command{
 	Use:   "generate <dir>",
 	Short: "Generate an empty config",
@@ -56,13 +50,7 @@ var checkCmd = &cobra.Command{
 			return fmt.Errorf("could not resolve path %s: %w", args[0], err)
 		}
 
-		projects, err := m4b.NewProjectsByArgs(
-			path,
-			recursive,
-			audioFileProvider,
-			audioProcessor,
-			trackFactory,
-		)
+		projects, err := m4b.NewProjectsByArgs(path, recursive)
 
 		if err != nil {
 			return fmt.Errorf("could not create project(s): %w", err)
@@ -117,7 +105,7 @@ var chaptersCmd = &cobra.Command{
 			return fmt.Errorf("could not resolve path %s: %w", args[0], err)
 		}
 
-		projects, err := m4b.NewProjectsFromPath(path, audioFileProvider, audioProcessor, trackFactory)
+		projects, err := m4b.NewProjectsFromPath(path)
 		if err != nil {
 			return err
 		}
@@ -148,12 +136,9 @@ var metadataCmd = &cobra.Command{
 			return fmt.Errorf("could not resolve path %s: %w", args[0], err)
 		}
 
-		projects, err := m4b.NewProjectsFromPath(path, audioFileProvider, audioProcessor, trackFactory)
+		projects, err := m4b.NewProjectsFromPath(path)
 		if err != nil {
-			return fmt.Errorf("could not load config %s: %w", path, err)
-		}
-		if len(projects) < 1 {
-			return fmt.Errorf("got no projects for path")
+			return fmt.Errorf("could not create project: %w", err)
 		}
 
 		metadata, err := projects[0].Metadata()
@@ -176,7 +161,7 @@ var filenameCmd = &cobra.Command{
 			return fmt.Errorf("could not resolve path %s: %w", args[0], err)
 		}
 
-		projects, err := m4b.NewProjectsFromPath(path, audioFileProvider, audioProcessor, trackFactory)
+		projects, err := m4b.NewProjectsFromPath(path)
 		if err != nil {
 			return fmt.Errorf("could not load config %s: %w", path, err)
 		}
@@ -204,7 +189,7 @@ var filesCmd = &cobra.Command{
 			return fmt.Errorf("could not resolve path %s: %w", args[0], err)
 		}
 
-		projects, err := m4b.NewProjectsFromPath(path, audioFileProvider, audioProcessor, trackFactory)
+		projects, err := m4b.NewProjectsFromPath(path)
 		if err != nil {
 			return fmt.Errorf("could not load config %s: %w", path, err)
 		}
