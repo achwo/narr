@@ -42,7 +42,7 @@ func TestFFmpegAudioProcessor_Concat(t *testing.T) {
 	processor := &FFmpegAudioProcessor{
 		Command: &fakeCommand,
 	}
-	inputFiles := []string{"filepath1.m4a", "filepath2.m4a"}
+	inputFiles := []string{"filepath'1.m4a", "filepath2.m4a"}
 	outputPath := "./output"
 
 	filelistFile, err := os.CreateTemp("", "filelist")
@@ -52,7 +52,7 @@ func TestFFmpegAudioProcessor_Concat(t *testing.T) {
 	result, err := processor.Concat(inputFiles, filelistFile.Name(), outputPath)
 	require.NoError(t, err)
 
-	expectedFilelistContent := "file 'filepath1.m4a'\nfile 'filepath2.m4a'\n"
+	expectedFilelistContent := "file 'filepath'\\''1.m4a'\nfile 'filepath2.m4a'\n"
 
 	actualContent, err := os.ReadFile(filelistFile.Name())
 	require.NoError(t, err)

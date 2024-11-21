@@ -118,7 +118,8 @@ func (p *FFmpegAudioProcessor) Concat(files []string, filelistFile string, outpu
 func (p *FFmpegAudioProcessor) filelistFileContent(files []string) string {
 	var sb strings.Builder
 	for _, file := range files {
-		fmt.Fprintf(&sb, "file '%s'\n", file)
+		escapedPath := strings.ReplaceAll(file, "'", "'\\''")
+		fmt.Fprintf(&sb, "file '%s'\n", escapedPath)
 	}
 	return sb.String()
 }

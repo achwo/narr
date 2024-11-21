@@ -246,7 +246,7 @@ func (p *Project) ConvertToM4B() (string, error) {
 	fmt.Println("Concating files")
 	m4bFile, err := p.deps.AudioProcessor.Concat(m4aFiles, p.filelistFile(), p.workDir)
 	if err != nil {
-		return "", fmt.Errorf("could not concat files: %w", err)
+		return "", err
 	}
 
 	fmt.Println("Adding metadata to m4b")
