@@ -274,9 +274,11 @@ func (p *Project) ConvertToM4B() (string, error) {
 		return "", fmt.Errorf("could not add cover to %s: %w", m4bFile, err)
 	}
 
-	fmt.Println("Adding chapters to m4b")
-	if err = p.deps.AudioProcessor.AddChapters(m4bFile, chapters); err != nil {
-		return "", fmt.Errorf("could not add chapters to %s: %w", m4bFile, err)
+	if p.Config.HasChapters {
+		fmt.Println("Adding chapters to m4b")
+		if err = p.deps.AudioProcessor.AddChapters(m4bFile, chapters); err != nil {
+			return "", fmt.Errorf("could not add chapters to %s: %w", m4bFile, err)
+		}
 	}
 
 	if err = os.MkdirAll(filepath.Dir(finalFilename), 0755); err != nil {
