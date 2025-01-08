@@ -54,8 +54,8 @@ func TestSanitizePathComponent(t *testing.T) {
 		input    string
 		expected string
 	}{
+		{name: "replaces ?", input: "Something With ???", expected: "Something With ___"},
 		{name: "does not replace .", input: "J.R.R. Tolkien", expected: "J.R.R. Tolkien"},
-		{name: "does not replace ?", input: "Something With ???", expected: "Something With ???"},
 		{name: "does not replace '", input: "Stanislawa d'Asp", expected: "Stanislawa d'Asp"},
 	}
 

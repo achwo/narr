@@ -60,7 +60,7 @@ func TestFilename(t *testing.T) {
 	home, err := os.UserHomeDir()
 	require.NoError(t, err)
 
-	require.Equal(t, filepath.Join(home, "narr", "Hans Wurst_ read by George Washington/The Book?/The Book?.m4b"), filename)
+	require.Equal(t, filepath.Join(home, "narr", "Hans Wurst_ read by George Washington/The Book_/The Book_.m4b"), filename)
 }
 
 func TestTracks(t *testing.T) {
