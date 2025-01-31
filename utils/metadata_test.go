@@ -10,10 +10,10 @@ var fullMetadata = `;FFMETADATA1
 major_brand=M4A
 minor_version=512
 compatible_brands=M4A isomiso2
-title=102/Doppelte Bäumung
+title=123/Einfache Bäumung
 artist=Something With ???
 album_artist=Something With ???
-album=102/Doppelte Bäumung
+album=123/Einfache Bäumung
 date=2002-03-11
 disc=1
 track=1
@@ -32,8 +32,8 @@ func TestGetMetadataField(t *testing.T) {
 			metadata: fullMetadata,
 			tags:     []string{"title", "album", "date"},
 			expected: []TagWithValue{
-				{Tag: "title", Value: "102/Doppelte Bäumung"},
-				{Tag: "album", Value: "102/Doppelte Bäumung"},
+				{Tag: "title", Value: "123/Einfache Bäumung"},
+				{Tag: "album", Value: "123/Einfache Bäumung"},
 				{Tag: "date", Value: "2002-03-11"},
 			},
 		},
@@ -87,10 +87,10 @@ func TestUpdateMetadataTags(t *testing.T) {
 major_brand=M4A
 minor_version=512
 compatible_brands=M4A isomiso2
-title=Folge 102: Doppelte Bäumung
+title=Folge 123: Einfache Bäumung
 artist=Something With ???
 album_artist=Something With ???
-album=Folge 102: Doppelte Bäumung
+album=Folge 123: Einfache Bäumung
 date=2002-03-11
 disc=1
 track=1
@@ -111,32 +111,32 @@ encoder=Lavf61.7.100`,
 		{
 			name: "field does not exist",
 			metadata: `;FFMETADATA1
-		title=102/Doppelte Bäumung`,
+		title=123/Einfache Bäumung`,
 			tags:   []string{"album"},
 			regex:  regexp.MustCompile(`^(\d+)/(.+)$`),
 			format: "Folge %s: %s",
 			expected: `;FFMETADATA1
-		title=102/Doppelte Bäumung`,
+		title=123/Einfache Bäumung`,
 		},
 		{
 			name: "multiple fields, only one matches regex",
 			metadata: `;FFMETADATA1
-title=102/Doppelte Bäumung
+title=123/Einfache Bäumung
 album=Other Bäumung`,
 			tags:   []string{"album", "title"},
 			regex:  regexp.MustCompile(`^(\d+)/(.+)$`),
 			format: "Folge %s: %s",
 			expected: `;FFMETADATA1
-title=Folge 102: Doppelte Bäumung
+title=Folge 123: Einfache Bäumung
 album=Other Bäumung`,
 		},
 		{
 			name:     "only one format string",
-			metadata: `title=Und der freiTag`,
+			metadata: `title=Und der hunger`,
 			tags:     []string{"title"},
 			regex:    regexp.MustCompile(`^Und(.+)$`),
 			format:   "und%s",
-			expected: `title=und der freiTag`,
+			expected: `title=und der hunger`,
 		},
 	}
 

@@ -91,15 +91,7 @@ generate-test-files:
 # OPERATIONS
 # ==================================================================================== #
 
-## push: push changes to the remote Git repository
-.PHONY: push
+## install: install the app via go install
+.PHONY: install
 push: confirm audit no-dirty
-	git push
-
-## production/deploy: deploy the application to production
-.PHONY: production/deploy
-production/deploy: confirm audit no-dirty
-	GOOS=linux GOARCH=amd64 go build -ldflags='-s' -o=/tmp/bin/linux_amd64/${binary_name} ${main_package_path}
-	upx -5 /tmp/bin/linux_amd64/${binary_name}
-	# Include additional deployment steps here...
-
+	go install

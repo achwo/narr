@@ -18,24 +18,24 @@ func TestApplyRegex(t *testing.T) {
 	}{
 		{
 			name:     "partial replace",
-			input:    "01 Folge 213_ Der Fluch der Medusa.m4b",
+			input:    "01 Folge 213_ Something a little Longer.m4b",
 			regex:    regexp.MustCompile(`^\d+ (.+)$`),
 			format:   "%s",
-			expected: "Folge 213_ Der Fluch der Medusa.m4b",
+			expected: "Folge 213_ Something a little Longer.m4b",
 		},
 		{
 			name:     "replace more complex",
-			input:    "01 213_Der Fluch der Medusa.m4b",
+			input:    "01 213_Something a little Longer.m4b",
 			regex:    regexp.MustCompile(`^\d+ (\d+)_(.+)$`),
 			format:   "Folge %s_ %s",
-			expected: "Folge 213_ Der Fluch der Medusa.m4b",
+			expected: "Folge 213_ Something a little Longer.m4b",
 		},
 		{
 			name:     "no match",
-			input:    "01 213_Der Fluch der Medusa.m4b",
+			input:    "01 213_Something a little Longer.m4b",
 			regex:    regexp.MustCompile(`^ \d+$`),
 			format:   "Folge %s_ %s",
-			expected: "01 213_Der Fluch der Medusa.m4b",
+			expected: "01 213_Something a little Longer.m4b",
 		},
 	}
 	for _, tt := range tests {
