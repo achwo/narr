@@ -23,8 +23,8 @@ func TestFFmpegAudioProcessor_ToM4A(t *testing.T) {
 	require.ElementsMatch(
 		t,
 		[][]string{
-			{"ffmpeg", "-i", "filepath1.m4a", "-c", "copy", "-c:a", "aac_at", "output/filepath1.m4a"},
-			{"ffmpeg", "-i", "filepath2.m4a", "-c", "copy", "-c:a", "aac_at", "output/filepath2.m4a"},
+			{"ffmpeg", "-i", "filepath1.m4a", "-c:a", "aac_at", "-vn", "output/filepath1.m4a"},
+			{"ffmpeg", "-i", "filepath2.m4a", "-c:a", "aac_at", "-vn", "output/filepath2.m4a"},
 		},
 		fakeCommand.CreatedCommands,
 	)

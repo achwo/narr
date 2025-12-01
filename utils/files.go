@@ -13,9 +13,9 @@ import (
 // OSAudioFileProvider implements audio file discovery functionality using the OS filesystem
 type OSAudioFileProvider struct{}
 
-// AudioFiles returns a list of M4A audio files found at the given path
+// AudioFiles returns a list of audio files found at the given path
 func (p *OSAudioFileProvider) AudioFiles(fullPath string) ([]string, error) {
-	return GetFilesByExtensions(fullPath, []string{".m4a", ".mp3"})
+	return GetFilesByExtensions(fullPath, []string{".m4a", ".mp3", ".flac"})
 }
 
 // GetValidFilePathFromArgs retrieves and validates a file path from command line arguments.

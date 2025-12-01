@@ -66,7 +66,7 @@ func (p *FFmpegAudioProcessor) convertToM4AWorker(
 ) {
 	for file := range in {
 		outFile := utils.ReplaceDirAndExt(file, outputPath, ".m4a")
-		cmd := p.Command.Create("ffmpeg", "-i", file, "-c", "copy", "-c:a", "aac_at", outFile)
+		cmd := p.Command.Create("ffmpeg", "-i", file, "-c:a", "aac_at", "-vn", outFile)
 
 		var outBuf bytes.Buffer
 		err := cmd.Run(&outBuf, &outBuf)
@@ -226,8 +226,8 @@ func (p *FFmpegAudioProcessor) AddMetadata(m4bFile string, metadata string, book
 	return nil
 }
 
-// ExtractCover extracts cover artwork from an M4A file
-// It takes the M4A file path and returns the path to the extracted cover image
+// ExtractCover extracts cover artwork from an audio file (M4A, MP3, FLAC, etc.)
+// It takes the audio file path and returns the path to the extracted cover image
 func (p *FFmpegAudioProcessor) ExtractCover(m4aFile string, workDir string) (string, error) {
 	coverFile := filepath.Join(workDir, "cover.jpg")
 	cmd := p.Command.Create("ffmpeg", "-i", m4aFile, "-an", "-vcodec", "copy", coverFile)
@@ -267,7 +267,7 @@ func (p *FFmpegAudioProcessor) ReadTitleAndDuration(file string) (string, float6
 		"-select_streams",
 		"a:0",
 		"-show_entries",
-		"format=duration:format_tags=title",
+		"format=duration:format_tags=title:stream_tags=title",
 		file,
 	)
 
@@ -279,8 +279,8 @@ func (p *FFmpegAudioProcessor) ReadTitleAndDuration(file string) (string, float6
 
 	probeContent := data.String()
 
-	durationRegex := regexp.MustCompile(`duration=([0-9]+\.[0-9]+)`)
-	titleRegex := regexp.MustCompile(`TAG:title=(.+)`)
+	durationRegex := regexp.MustCompile(`duration=([0-9]+\.?[0-9]*)`)
+	titleRegex := regexp.MustCompile(`(?i)TAG:title=(.+)`)
 
 	titleMatch := titleRegex.FindStringSubmatch(probeContent)
 	if len(titleMatch) < 2 {
