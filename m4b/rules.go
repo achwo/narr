@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"strings"
 
 	"github.com/achwo/narr/utils"
 )
@@ -22,15 +23,21 @@ type MetadataRule struct {
 // Apply executes the rule on the provided tags map, modifying the tags according
 // to the rule's type and parameters. Returns an error if the rule application fails.
 func (r *MetadataRule) Apply(tags map[string]string) error {
-	value, exists := tags[r.Tag]
+	// Normalize tag name to lowercase for case-insensitive matching
+	tagName := strings.ToLower(r.Tag)
+	value, exists := tags[tagName]
 
-	if !exists {
-		return fmt.Errorf("tag %s does not exist", r.Tag)
+	// For "set" and "delete" types, we don't require the tag to exist
+	if !exists && r.Type != "set" && r.Type != "delete" {
+		return fmt.Errorf("tag %s does not exist", tagName)
 	}
 
-	// TODO: implement delete, set
-
 	switch r.Type {
+	case "set":
+		// Set the value regardless of whether the tag exists
+		tags[tagName] = r.Value
+	case "delete":
+		delete(tags, tagName)
 	case "regex":
 		regex, err := regexp.Compile(r.Regex)
 		if err != nil {
@@ -42,7 +49,7 @@ func (r *MetadataRule) Apply(tags map[string]string) error {
 			// TODO: might be better in construction (want to know validity in config check also)
 			return fmt.Errorf("could not apply rule '%s': %w", r.Regex, err)
 		}
-		tags[r.Tag] = newValue
+		tags[tagName] = newValue
 	default:
 		return errors.ErrUnsupported
 	}

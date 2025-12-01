@@ -62,9 +62,23 @@ func (t *Track) Metadata() (map[string]string, []string, error) {
 		tags, tagOrder := t.getMetadataTags(metadata)
 
 		for _, rule := range t.MetadataRules {
+			// Normalize tag name to lowercase for case-insensitive matching
+			tagName := strings.ToLower(rule.Tag)
+
+			// Track which tags existed before applying the rule
+			_, existedBefore := tags[tagName]
+
 			err := rule.Apply(tags)
 			if err != nil {
 				return nil, nil, err
+			}
+
+			// If the tag didn't exist before but exists now (e.g., from "set" rule),
+			// add it to the tagOrder
+			if !existedBefore {
+				if _, existsNow := tags[tagName]; existsNow {
+					tagOrder = append(tagOrder, tagName)
+				}
 			}
 		}
 
@@ -82,7 +96,8 @@ func (t *Track) MetadataTag(tag string) (string, bool) {
 		return "", false
 	}
 
-	value, exists := metadata[tag]
+	// Normalize tag name to lowercase for case-insensitive lookup
+	value, exists := metadata[strings.ToLower(tag)]
 	return value, exists
 }
 
@@ -101,14 +116,20 @@ func (t *Track) getMetadataTags(metadata string) (map[string]string, []string) {
 			continue
 		}
 
-		tagOrder = append(tagOrder, split[0])
+		// Normalize tag names to lowercase for case-insensitive matching
+		tagName := strings.ToLower(split[0])
+
+		// Only add to tagOrder if this tag hasn't been seen before
+		if _, exists := tags[tagName]; !exists {
+			tagOrder = append(tagOrder, tagName)
+		}
 
 		if len(split) == 1 {
-			tags[split[0]] = ""
+			tags[tagName] = ""
 			continue
 		}
 
-		tags[split[0]] = split[1]
+		tags[tagName] = split[1]
 	}
 
 	return tags, tagOrder
