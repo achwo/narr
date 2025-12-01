@@ -5,7 +5,9 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
+	"unicode"
 )
 
 // ApplyRegex applies a regular expression pattern to an input string and formats the captured groups
@@ -59,4 +61,46 @@ func ReplaceDirAndExt(file string, dir string, ext string) string {
 	fileName := filepath.Base(file)
 	fileName = strings.TrimSuffix(fileName, filepath.Ext(file)) + ".m4a"
 	return path.Join(dir, fileName)
+}
+
+// NaturalCompare compares two strings using natural sort order (numbers are compared numerically).
+// For example: "file2.txt" < "file10.txt" (unlike lexicographic where "file10.txt" < "file2.txt")
+func NaturalCompare(a, b string) int {
+	ia, ib := 0, 0
+	for ia < len(a) && ib < len(b) {
+		// Check if both current characters are digits
+		if unicode.IsDigit(rune(a[ia])) && unicode.IsDigit(rune(b[ib])) {
+			// Extract full number from both strings
+			numStartA := ia
+			for ia < len(a) && unicode.IsDigit(rune(a[ia])) {
+				ia++
+			}
+			numStartB := ib
+			for ib < len(b) && unicode.IsDigit(rune(b[ib])) {
+				ib++
+			}
+
+			// Parse and compare numbers
+			numA, _ := strconv.Atoi(a[numStartA:ia])
+			numB, _ := strconv.Atoi(b[numStartB:ib])
+
+			if numA != numB {
+				if numA < numB {
+					return -1
+				}
+				return 1
+			}
+			// Numbers are equal, continue comparing rest of string
+		} else {
+			// Compare characters normally
+			if a[ia] != b[ib] {
+				return int(a[ia]) - int(b[ib])
+			}
+			ia++
+			ib++
+		}
+	}
+
+	// If one string is a prefix of the other
+	return len(a) - len(b)
 }

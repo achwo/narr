@@ -356,7 +356,7 @@ func sortTracks(a, b Track) int {
 		return cmp.Compare(trackNumberI, trackNumberJ)
 	}
 
-	return strings.Compare(a.File, b.File)
+	return utils.NaturalCompare(a.File, b.File)
 }
 
 // Chapters generates chapter markers for the audiobook based on the track metadata

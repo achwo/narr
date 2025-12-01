@@ -66,3 +66,35 @@ func TestSanitizePathComponent(t *testing.T) {
 		})
 	}
 }
+
+func TestNaturalCompare(t *testing.T) {
+	tests := []struct {
+		name     string
+		a        string
+		b        string
+		expected int // negative if a < b, 0 if equal, positive if a > b
+	}{
+		{name: "numbers in order", a: "file2.txt", b: "file10.txt", expected: -1},
+		{name: "numbers reversed", a: "file10.txt", b: "file2.txt", expected: 1},
+		{name: "equal strings", a: "file10.txt", b: "file10.txt", expected: 0},
+		{name: "three digit numbers", a: "file100.txt", b: "file10.txt", expected: 1},
+		{name: "leading zeros", a: "file01.txt", b: "file1.txt", expected: 1}, // numerically equal but longer string
+		{name: "prefix comparison", a: "file10", b: "file10.txt", expected: -1},
+		{name: "multiple numbers", a: "01-file-10.txt", b: "02-file-9.txt", expected: -1},
+		{name: "chapter example", a: "10-kapitel.flac", b: "100-kapitel.flac", expected: -1},
+		{name: "chapter example 2", a: "09-kapitel.flac", b: "10-kapitel.flac", expected: -1},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := NaturalCompare(tt.a, tt.b)
+			if tt.expected < 0 {
+				require.Less(t, result, 0, "expected %s < %s", tt.a, tt.b)
+			} else if tt.expected > 0 {
+				require.Greater(t, result, 0, "expected %s > %s", tt.a, tt.b)
+			} else {
+				require.Equal(t, 0, result, "expected %s == %s", tt.a, tt.b)
+			}
+		})
+	}
+}
