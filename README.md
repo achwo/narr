@@ -39,7 +39,8 @@ directory when it is omitted.
   `check chapters`, `check metadata`, `check filename` and `check files` print
   only that one part for a single project.
 - `narr m4b run [dir]` — runs the conversion and writes the result to
-  `~/narr/<artist>/<album>/<album>.m4b`. `-r, --recursive` converts all projects
+  `~/narr/<album_artist>/<album>/<album>.m4b`, falling back to `artist` when
+  `album_artist` is missing or empty. `-r, --recursive` converts all projects
   below the path. A project is skipped when the output file already exists and its
   duration is within 5% of the summed input duration.
 
