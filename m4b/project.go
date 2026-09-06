@@ -255,7 +255,7 @@ func (p *Project) ConvertToM4B() (string, error) {
 		return "", fmt.Errorf("could not get metadata for m4b: %w", err)
 	}
 
-	_, bookTitle, err := p.ArtistAndBookTitle()
+	_, bookTitle, err := p.AuthorAndBookTitle()
 	if err != nil {
 		return "", fmt.Errorf("could not read book title: %w", err)
 	}
@@ -443,16 +443,16 @@ func (p *Project) Metadata() (string, error) {
 }
 
 // Filename returns the output file name for the project.
-// It takes artist and book title from the first file as a basis.
+// It takes author and book title from the first file as a basis.
 func (p *Project) Filename() (string, error) {
-	artist, album, err := p.ArtistAndBookTitle()
+	author, album, err := p.AuthorAndBookTitle()
 	if err != nil {
 		return "", err
 	}
 
 	filename := filepath.Join(
 		p.Config.OutputPath(),
-		utils.SanitizePathComponent(artist),
+		utils.SanitizePathComponent(author),
 		utils.SanitizePathComponent(album),
 		utils.SanitizePathComponent(album)+".m4b",
 	)
@@ -460,9 +460,10 @@ func (p *Project) Filename() (string, error) {
 	return filename, nil
 }
 
-// ArtistAndBookTitle reads the metadata from the first track and returns the
-// artist and book title.
-func (p *Project) ArtistAndBookTitle() (string, string, error) {
+// AuthorAndBookTitle reads the metadata from the first track and returns the
+// author and book title. The author is taken from album_artist and falls back
+// to artist if album_artist is missing or empty.
+func (p *Project) AuthorAndBookTitle() (string, string, error) {
 	audioFiles, err := p.Tracks()
 	if err != nil {
 		return "", "", fmt.Errorf("could not load audio files: %w", err)
@@ -475,12 +476,15 @@ func (p *Project) ArtistAndBookTitle() (string, string, error) {
 	tags, _, err := p.getUpdatedMetadata()
 
 	if err != nil {
-		return "", "", fmt.Errorf("could not get metadata for artist and book title: %w", err)
+		return "", "", fmt.Errorf("could not get metadata for author and book title: %w", err)
 	}
 
-	artist, exists := tags["artist"]
-	if !exists {
-		return "", "", errors.New("no artist found in metadata")
+	author := tags["album_artist"]
+	if author == "" {
+		author = tags["artist"]
+	}
+	if author == "" {
+		return "", "", errors.New("no album_artist or artist found in metadata")
 	}
 
 	album, exists := tags["album"]
@@ -488,7 +492,7 @@ func (p *Project) ArtistAndBookTitle() (string, string, error) {
 		return "", "", errors.New("no album found in metadata")
 	}
 
-	return artist, album, nil
+	return author, album, nil
 }
 
 func (p *Project) getUpdatedMetadata() (map[string]string, []string, error) {

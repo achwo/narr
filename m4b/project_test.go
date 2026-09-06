@@ -63,6 +63,107 @@ func TestFilename(t *testing.T) {
 	require.Equal(t, filepath.Join(home, "narr", "Hans Wurst_ read by George Washington/The Book_/The Book_.m4b"), filename)
 }
 
+func TestFilename_AlbumArtistAndArtist_UsesAlbumArtist(t *testing.T) {
+	filename := filenameForMetadata(t, `;FFMETADATA1
+title=Chapter 01-02: Star dust
+album_artist=Testautor
+artist=Test Sprecher
+album=The Book
+track=1/16
+disc=1/10
+date=2002-09-16`)
+
+	require.Equal(t, filepath.Join(homeDir(t), "narr", "Testautor", "The Book", "The Book.m4b"), filename)
+}
+
+func TestFilename_OnlyArtist_UsesArtist(t *testing.T) {
+	filename := filenameForMetadata(t, `;FFMETADATA1
+title=Chapter 01-02: Star dust
+artist=Test Sprecher
+album=The Book
+track=1/16
+disc=1/10
+date=2002-09-16`)
+
+	require.Equal(t, filepath.Join(homeDir(t), "narr", "Test Sprecher", "The Book", "The Book.m4b"), filename)
+}
+
+func TestFilename_EmptyAlbumArtist_UsesArtist(t *testing.T) {
+	filename := filenameForMetadata(t, `;FFMETADATA1
+title=Chapter 01-02: Star dust
+album_artist=
+artist=Test Sprecher
+album=The Book
+track=1/16
+disc=1/10
+date=2002-09-16`)
+
+	require.Equal(t, filepath.Join(homeDir(t), "narr", "Test Sprecher", "The Book", "The Book.m4b"), filename)
+}
+
+func TestFilename_MixedCaseAlbumArtistTag_UsesAlbumArtist(t *testing.T) {
+	filename := filenameForMetadata(t, `;FFMETADATA1
+title=Chapter 01-02: Star dust
+ALBUM_ARTIST=Testautor
+artist=Test Sprecher
+album=The Book
+track=1/16
+disc=1/10
+date=2002-09-16`)
+
+	require.Equal(t, filepath.Join(homeDir(t), "narr", "Testautor", "The Book", "The Book.m4b"), filename)
+}
+
+func TestFilename_NoArtistTags_ReturnsError(t *testing.T) {
+	project, err := m4b.NewProjectWithDeps(
+		m4b.ProjectConfig{ChapterRules: []m4b.ChapterRule{}},
+		*depsForMetadata(`;FFMETADATA1
+title=Chapter 01-02: Star dust
+album=The Book
+track=1/16
+disc=1/10
+date=2002-09-16`),
+	)
+	require.NoError(t, err)
+
+	_, err = project.Filename()
+	require.Error(t, err)
+}
+
+func homeDir(t *testing.T) string {
+	t.Helper()
+	home, err := os.UserHomeDir()
+	require.NoError(t, err)
+	return home
+}
+
+func filenameForMetadata(t *testing.T, metadata string) string {
+	t.Helper()
+
+	config := m4b.ProjectConfig{ChapterRules: []m4b.ChapterRule{}}
+	project, err := m4b.NewProjectWithDeps(config, *depsForMetadata(metadata))
+	require.NoError(t, err)
+
+	filename, err := project.Filename()
+	require.NoError(t, err)
+
+	return filename
+}
+
+func depsForMetadata(metadata string) *m4b.ProjectDependencies {
+	data := map[string]m4b.FileData{
+		"file1.m4a": {Title: "Chapter 1", Duration: 5000, Metadata: metadata},
+	}
+
+	fakeAudioProcessor := &m4b.NullAudioProcessor{Data: data}
+
+	return &m4b.ProjectDependencies{
+		AudioFileProvider: &FakeAudioFileProvider{Files: []string{"file1.m4a"}},
+		AudioProcessor:    fakeAudioProcessor,
+		TrackFactory:      &m4b.FFmpegTrackFactory{AudioProcessor: fakeAudioProcessor},
+	}
+}
+
 func TestTracks(t *testing.T) {
 	config := m4b.ProjectConfig{ChapterRules: []m4b.ChapterRule{}}
 	data := make(map[string]m4b.FileData)
