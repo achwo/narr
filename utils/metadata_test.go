@@ -175,6 +175,24 @@ func TestParseFFMetadata_UppercaseTag_LowercasesTagName(t *testing.T) {
 	assert.Equal(t, []string{"title"}, parsed.TagOrder)
 }
 
+func TestFFMetadata_OriginalName_UppercaseTag_ReturnsTheSpellingFromTheDocument(t *testing.T) {
+	parsed := ParseFFMetadata(";FFMETADATA1\nSERIES=Die Reihe")
+
+	assert.Equal(t, "SERIES", parsed.OriginalName("series"))
+}
+
+func TestFFMetadata_OriginalName_UnknownTag_ReturnsTagUnchanged(t *testing.T) {
+	parsed := ParseFFMetadata(";FFMETADATA1\ntitle=Book")
+
+	assert.Equal(t, "series", parsed.OriginalName("series"))
+}
+
+func TestFFMetadata_OriginalName_AfterClone_IsPreserved(t *testing.T) {
+	parsed := ParseFFMetadata(";FFMETADATA1\nSERIES=Die Reihe").Clone()
+
+	assert.Equal(t, "SERIES", parsed.OriginalName("series"))
+}
+
 func TestParseFFMetadata_EscapedValue_ReturnsUnescapedValue(t *testing.T) {
 	parsed := ParseFFMetadata(";FFMETADATA1\ntitle=a\\=b\\;c\\#d\\\\e")
 

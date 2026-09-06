@@ -500,13 +500,13 @@ func (p *Project) Metadata() (string, error) {
 	lines := []string{firstLine}
 
 	for _, tag := range tagOrder {
-		switch tag {
+		switch strings.ToLower(tag) {
 		case "track":
 			continue
 		case "disc":
 			continue
 		default:
-			lines = append(lines, tag+"="+tags[tag])
+			lines = append(lines, tag+"="+tags[strings.ToLower(tag)])
 		}
 	}
 

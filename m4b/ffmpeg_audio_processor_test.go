@@ -2,7 +2,9 @@ package m4b
 
 import (
 	"bytes"
+	"fmt"
 	"os"
+	"slices"
 	"sync"
 	"testing"
 
@@ -121,7 +123,6 @@ func TestFFmpegAudioProcessor_AddMetadata(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, metadataContent, string(actualContent))
 
-	require.Len(t, fakeCommand.CreatedCommands, 1)
 	require.Equal(
 		t,
 		[]string{
@@ -140,6 +141,7 @@ func TestFFmpegAudioProcessor_AddMetadata(t *testing.T) {
 		},
 		fakeCommand.CreatedCommands[0],
 	)
+	require.Empty(t, fakeCommand.CommandsNamed(AtomicParsleyCommand))
 	require.True(t, fakeCommand.Cmd.Executed)
 
 	_, err = os.Stat(outputFile)
@@ -221,9 +223,9 @@ func TestFFmpegAudioProcessor_AddCover(t *testing.T) {
 	err := processor.AddCover(inputFile, coverFile)
 	require.NoError(t, err)
 
-	require.Len(t, fakeCommand.CreatedCommands, 1)
-	require.Equal(
+	require.Contains(
 		t,
+		fakeCommand.CreatedCommands,
 		[]string{
 			"ffmpeg",
 			"-i",
@@ -240,8 +242,8 @@ func TestFFmpegAudioProcessor_AddCover(t *testing.T) {
 			"attached_pic",
 			outputFile,
 		},
-		fakeCommand.CreatedCommands[0],
 	)
+	require.Empty(t, fakeCommand.CommandsNamed(AtomicParsleyCommand))
 	require.True(t, fakeCommand.Cmd.Executed)
 
 	_, err = os.Stat(outputFile)
@@ -254,6 +256,9 @@ type FakeCommand struct {
 	Cmd             *FakeCmd
 	Stdout          string
 	Stderr          string
+	Stdouts         []string
+	MissingOnPath   []string
+	RunErr          error
 }
 
 func (c *FakeCommand) Create(name string, args ...string) Cmd {
@@ -262,13 +267,42 @@ func (c *FakeCommand) Create(name string, args ...string) Cmd {
 
 	fullArgs := append([]string{name}, args...)
 	c.CreatedCommands = append(c.CreatedCommands, fullArgs)
-	c.Cmd = &FakeCmd{Stdout: c.Stdout, Stderr: c.Stderr, Executed: false}
+
+	stdout := c.Stdout
+	if len(c.Stdouts) > 0 {
+		stdout = c.Stdouts[0]
+		c.Stdouts = c.Stdouts[1:]
+	}
+
+	c.Cmd = &FakeCmd{Stdout: stdout, Stderr: c.Stderr, Err: c.RunErr, Executed: false}
 	return c.Cmd
+}
+
+func (c *FakeCommand) LookPath(name string) error {
+	if slices.Contains(c.MissingOnPath, name) {
+		return fmt.Errorf("%s: executable file not found in $PATH", name)
+	}
+	return nil
+}
+
+// CommandsNamed returns all created commands that invoke the given executable.
+func (c *FakeCommand) CommandsNamed(name string) [][]string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	var matching [][]string
+	for _, command := range c.CreatedCommands {
+		if command[0] == name {
+			matching = append(matching, command)
+		}
+	}
+	return matching
 }
 
 type FakeCmd struct {
 	Stdout   string
 	Stderr   string
+	Err      error
 	Executed bool
 }
 
@@ -276,12 +310,12 @@ func (c *FakeCmd) Run(stdout, stderr *bytes.Buffer) error {
 	c.Executed = true
 	stdout.WriteString(c.Stdout)
 	stderr.WriteString(c.Stderr)
-	return nil
+	return c.Err
 }
 
 func (c *FakeCmd) RunI(_ *bytes.Reader, stdout, stderr *bytes.Buffer) error {
 	c.Executed = true
 	stdout.WriteString(c.Stdout)
 	stderr.WriteString(c.Stderr)
-	return nil
+	return c.Err
 }

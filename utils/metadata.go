@@ -114,6 +114,8 @@ type FFMetadata struct {
 	Tags     map[string]string
 	TagOrder []string
 	Sections string
+
+	names map[string]string
 }
 
 // ParseFFMetadata parses a metadata string in ffmetadata format, as produced by
@@ -146,11 +148,31 @@ func ParseFFMetadata(metadata string) *FFMetadata {
 			continue
 		}
 
-		tag := strings.ToLower(UnescapeFFMetadataValue(line[:separator]))
+		name := UnescapeFFMetadataValue(line[:separator])
+		tag := strings.ToLower(name)
+		parsed.rememberName(tag, name)
 		parsed.SetTag(tag, UnescapeFFMetadataValue(line[separator+1:]))
 	}
 
 	return parsed
+}
+
+// OriginalName returns the spelling the tag had in the document it was parsed
+// from. Tags that were not in that document are returned unchanged.
+func (m *FFMetadata) OriginalName(tag string) string {
+	if name, exists := m.names[tag]; exists {
+		return name
+	}
+	return tag
+}
+
+func (m *FFMetadata) rememberName(tag string, name string) {
+	if m.names == nil {
+		m.names = make(map[string]string)
+	}
+	if _, exists := m.names[tag]; !exists {
+		m.names[tag] = name
+	}
 }
 
 // String renders the metadata back into ffmetadata format, escaping values and
@@ -216,6 +238,7 @@ func (m *FFMetadata) Clone() *FFMetadata {
 		Tags:     maps.Clone(m.Tags),
 		TagOrder: slices.Clone(m.TagOrder),
 		Sections: m.Sections,
+		names:    maps.Clone(m.names),
 	}
 }
 

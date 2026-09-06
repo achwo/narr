@@ -9,8 +9,9 @@ import (
 )
 
 var applyCmd = &cobra.Command{
-	Use:   "apply [path]",
-	Short: "Apply the metadataRules of a narr project to its audio files",
+	Use:          "apply [path]",
+	Short:        "Apply the metadataRules of a narr project to its audio files",
+	SilenceUsage: true,
 	Long: `Apply writes the metadataRules of a narr project config directly to the
 audio files of the project, without converting them to m4b.
 

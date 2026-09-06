@@ -48,6 +48,53 @@ date=2002-09-16`,
 	)
 }
 
+func TestMetadata_FreeformTagInSourceFile_KeepsItsSpelling(t *testing.T) {
+	config := m4b.ProjectConfig{
+		ChapterRules:  []m4b.ChapterRule{},
+		MetadataRules: []m4b.MetadataRule{{Type: "set", Tag: "AUDIBLE_ASIN", Value: "B01ABCDEFG"}},
+	}
+	deps := depsForMetadata(`;FFMETADATA1
+title=Star dust
+artist=Hans Wurst
+album=The Book
+SERIES=Die Reihe`)
+
+	project, err := m4b.NewProjectWithDeps(config, *deps)
+	require.NoError(t, err)
+
+	metadata, err := project.Metadata()
+	require.NoError(t, err)
+
+	require.Equal(
+		t,
+		`;FFMETADATA1
+title=Star dust
+artist=Hans Wurst
+album=The Book
+SERIES=Die Reihe
+AUDIBLE_ASIN=B01ABCDEFG`,
+		metadata,
+	)
+}
+
+func TestMetadata_RuleMatchesTagCaseInsensitively_UpdatesTheValue(t *testing.T) {
+	config := m4b.ProjectConfig{
+		ChapterRules:  []m4b.ChapterRule{},
+		MetadataRules: []m4b.MetadataRule{{Type: "set", Tag: "series", Value: "Andere Reihe"}},
+	}
+	deps := depsForMetadata(`;FFMETADATA1
+album=The Book
+SERIES=Die Reihe`)
+
+	project, err := m4b.NewProjectWithDeps(config, *deps)
+	require.NoError(t, err)
+
+	metadata, err := project.Metadata()
+	require.NoError(t, err)
+
+	require.Equal(t, ";FFMETADATA1\nalbum=The Book\nSERIES=Andere Reihe", metadata)
+}
+
 func TestFilename(t *testing.T) {
 	config := m4b.ProjectConfig{ChapterRules: []m4b.ChapterRule{}}
 	deps := setupDeps()
