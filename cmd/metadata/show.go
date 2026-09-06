@@ -26,9 +26,7 @@ var showCmd = &cobra.Command{
 			return fmt.Errorf("failed to read files within %s: %w", path, err)
 		}
 
-		audioProcessor := m4b.FFmpegAudioProcessor{
-			Command: &m4b.ExecCommand{},
-		}
+		audioProcessor := m4b.NewFFmpegAudioProcessor()
 		for _, file := range files {
 			metadata, err := audioProcessor.ReadMetadata(file)
 			if err != nil {

@@ -11,8 +11,10 @@ type FileData struct {
 // This can be useful for testing or as a placeholder implementation.
 type NullAudioProcessor struct {
 	Data     map[string]FileData
+	Written  map[string]string
 	ErrTitle error
 	ErrMeta  error
+	ErrWrite error
 }
 
 // ToM4A is a no-op implementation that returns nil values.
@@ -57,6 +59,20 @@ func (p *NullAudioProcessor) ReadTitleAndDuration(file string) (string, float64,
 	data := p.Data[file]
 
 	return data.Title, data.Duration, nil
+}
+
+// WriteMetadata records the metadata instead of writing it to the file.
+func (p *NullAudioProcessor) WriteMetadata(file string, metadata string, verbose bool) error {
+	if p.ErrWrite != nil {
+		return p.ErrWrite
+	}
+
+	if p.Written == nil {
+		p.Written = make(map[string]string)
+	}
+
+	p.Written[file] = metadata
+	return nil
 }
 
 // ReadMetadata returns the preconfigured metadata for a file

@@ -17,6 +17,12 @@ type FFmpegAudioProcessor struct {
 	Command Command
 }
 
+// NewFFmpegAudioProcessor creates a FFmpegAudioProcessor that runs ffmpeg as an
+// external command.
+func NewFFmpegAudioProcessor() *FFmpegAudioProcessor {
+	return &FFmpegAudioProcessor{Command: &ExecCommand{}}
+}
+
 // ToM4A converts audio files to M4A format using FFmpeg
 // It takes a slice of input file paths and an output directory path
 // Returns a slice of converted file paths or an error

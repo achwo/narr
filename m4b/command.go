@@ -38,7 +38,7 @@ func (c *ExecCmd) Run(stdout *bytes.Buffer, stderr *bytes.Buffer) error {
 
 // RunI works like Run, except that it also takes a stdin
 func (c *ExecCmd) RunI(stdin *bytes.Reader, stdout, stderr *bytes.Buffer) error {
-	c.cmd.Stdin = stderr
+	c.cmd.Stdin = stdin
 	c.cmd.Stderr = stderr
 	c.cmd.Stdout = stdout
 	return c.cmd.Run()

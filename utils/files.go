@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"syscall"
 )
 
 // OSAudioFileProvider implements audio file discovery functionality using the OS filesystem
@@ -117,4 +118,21 @@ func GetAllFilesByName(basepath string, name string) ([]string, error) {
 		return nil
 	})
 	return files, err
+}
+
+// HardLinkCount returns the number of hard links pointing to the file at path.
+// A count greater than one means that writing to the file also changes every
+// other path linked to the same inode.
+func HardLinkCount(path string) (uint64, error) {
+	info, err := os.Stat(path)
+	if err != nil {
+		return 0, fmt.Errorf("could not stat %s: %w", path, err)
+	}
+
+	stat, ok := info.Sys().(*syscall.Stat_t)
+	if !ok {
+		return 0, fmt.Errorf("could not determine hard link count of %s", path)
+	}
+
+	return uint64(stat.Nlink), nil
 }
