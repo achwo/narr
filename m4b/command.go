@@ -14,6 +14,7 @@ type Cmd interface {
 // Command is a factory interface for creating executable commands
 type Command interface {
 	Create(name string, args ...string) Cmd
+	LookPath(name string) error
 }
 
 // ExecCommand is a wrapper for executing external commands that implements the Command interface
@@ -22,6 +23,12 @@ type ExecCommand struct{}
 // Create returns a new Cmd instance that will execute the specified command with given arguments
 func (c *ExecCommand) Create(name string, args ...string) Cmd {
 	return &ExecCmd{cmd: *exec.Command(name, args...)}
+}
+
+// LookPath reports whether an executable with the given name exists on the PATH
+func (c *ExecCommand) LookPath(name string) error {
+	_, err := exec.LookPath(name)
+	return err
 }
 
 // ExecCmd is a wrapper for exec.Cmd for testability

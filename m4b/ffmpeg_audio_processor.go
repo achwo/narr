@@ -159,8 +159,14 @@ func (p *FFmpegAudioProcessor) createChaptersFile(m4bFile string, chapters strin
 
 // AddCover adds cover artwork to an M4B file
 // It takes the M4B file path and the cover image file path
+// Freeform MP4 tags that the remux drops are written back afterwards
 func (p *FFmpegAudioProcessor) AddCover(m4bFile string, coverFile string) error {
 	tempFile := p.ChangeFileExtension(m4bFile, ".withCover.m4b")
+
+	tagsBefore, err := p.mp4TagsOf(m4bFile)
+	if err != nil {
+		return fmt.Errorf("could not read metadata of %s: %w", m4bFile, err)
+	}
 
 	cmd := p.Command.Create(
 		"ffmpeg",
@@ -179,10 +185,15 @@ func (p *FFmpegAudioProcessor) AddCover(m4bFile string, coverFile string) error 
 		tempFile,
 	)
 	var outBuf bytes.Buffer
-	err := cmd.Run(&outBuf, &outBuf)
+	err = cmd.Run(&outBuf, &outBuf)
 	if err != nil {
 		fmt.Println(outBuf.String())
 		return fmt.Errorf("could not add cover: %w", err)
+	}
+
+	if err := p.preserveFreeformTags(m4bFile, tempFile, tagsBefore); err != nil {
+		os.Remove(tempFile)
+		return err
 	}
 
 	err = os.Rename(tempFile, m4bFile)
@@ -195,6 +206,7 @@ func (p *FFmpegAudioProcessor) AddCover(m4bFile string, coverFile string) error 
 
 // AddMetadata adds metadata tags to an M4B file
 // It takes the M4B file path, metadata content, and book title
+// Freeform MP4 tags that ffmpeg cannot write are written back afterwards
 func (p *FFmpegAudioProcessor) AddMetadata(m4bFile string, metadata string, bookTitle string) error {
 	metadataFile, err := p.createMetadataFile(m4bFile, metadata)
 	if err != nil {
@@ -222,6 +234,11 @@ func (p *FFmpegAudioProcessor) AddMetadata(m4bFile string, metadata string, book
 	if err != nil {
 		fmt.Println(outBuf.String())
 		return fmt.Errorf("could not add metadata: %w", err)
+	}
+
+	if err := p.preserveFreeformTags(m4bFile, tempFile, metadata); err != nil {
+		os.Remove(tempFile)
+		return err
 	}
 
 	err = os.Rename(tempFile, m4bFile)
@@ -342,6 +359,7 @@ func (p *FFmpegAudioProcessor) WriteMetadata(file string, metadata string, verbo
 
 	err := p.WriteMetadataO(file, tmpFile, metadata, verbose)
 	if err != nil {
+		os.Remove(tmpFile)
 		return fmt.Errorf("could not write metadata: %w", err)
 	}
 
@@ -355,6 +373,7 @@ func (p *FFmpegAudioProcessor) WriteMetadata(file string, metadata string, verbo
 
 // WriteMetadataO is like WriteMetadata with explicit output file
 // WriteMetadataO writes metadata to a new output file instead of modifying the input file
+// Freeform MP4 tags that ffmpeg cannot write are written back afterwards
 // If verbose is true, prints FFmpeg command and output
 func (p *FFmpegAudioProcessor) WriteMetadataO(inputFile string, outputFile string, metadata string, verbose bool) error {
 	writeCmd := p.Command.Create("ffmpeg", "-i", inputFile, "-f", "ffmetadata", "-i", "-", "-map_metadata", "1", "-c", "copy", outputFile)
@@ -370,7 +389,8 @@ func (p *FFmpegAudioProcessor) WriteMetadataO(inputFile string, outputFile strin
 	if err != nil {
 		return fmt.Errorf("ffmpeg command failed: %v\n%s", err, outBuf.String())
 	}
-	return nil
+
+	return p.preserveFreeformTags(inputFile, outputFile, metadata)
 }
 
 // ReadMetadata extracts metadata from a media file at the given path

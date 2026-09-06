@@ -22,6 +22,14 @@ go install
 - Go 1.23.2 or higher (see `go.mod`)
 - `ffmpeg` and `ffprobe` on the PATH (metadata, cover, concat, duration)
 - `mp4chaps` (mp4v2), only needed for projects with `hasChapters: true`
+- `AtomicParsley`, needed whenever an MP4 file (`.m4b`, `.m4a`, `.mp4`) carries tags
+  outside the standard MP4 key set — `SERIES`, `PART`, `SUBTITLE` or `AUDIBLE_ASIN`
+  on Audible files, for example. ffmpeg reads those freeform atoms but its mov muxer
+  cannot write them, so narr writes them back with AtomicParsley after every write.
+  When such a tag would be lost and AtomicParsley is not on the PATH, narr aborts
+  and leaves the file unchanged rather than dropping the tag silently. Files without
+  such tags do not need it. `mp4tags` from mp4v2 is not an alternative: it only
+  writes the fixed iTunes key set and has no option for freeform atoms.
 - With `shouldConvert: true`, narr encodes via `ffmpeg -c:a aac_at`, so the ffmpeg
   build must provide the AudioToolbox AAC encoder (macOS)
 
@@ -59,7 +67,8 @@ directory when it is omitted.
   Use `--dryRun` first: it prints the tag diff per file and writes nothing.
   When writing, files with more than one hard link are skipped, because writing them
   would change the other copies as well. Each run ends with a summary of updated,
-  unchanged, dry-run and skipped files.
+  unchanged, dry-run and skipped files. Freeform MP4 tags survive the run, see
+  Prerequisites for the AtomicParsley requirement.
 
 ### file
 

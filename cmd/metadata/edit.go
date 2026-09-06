@@ -10,9 +10,10 @@ import (
 )
 
 var editCmd = &cobra.Command{
-	Use:     "edit",
-	Short:   "The metadata tags for given audio file",
-	Example: "narr metadata edit [file]",
+	Use:          "edit",
+	Short:        "The metadata tags for given audio file",
+	SilenceUsage: true,
+	Example:      "narr metadata edit [file]",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		dryRun, _ := cmd.Flags().GetBool("dryRun")
 		verbose, _ := cmd.Flags().GetBool("verbose")

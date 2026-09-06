@@ -77,7 +77,7 @@ func (t *Track) Metadata() (map[string]string, []string, error) {
 			// add it to the tagOrder
 			if !existedBefore {
 				if _, existsNow := tags[tagName]; existsNow {
-					tagOrder = append(tagOrder, tagName)
+					tagOrder = append(tagOrder, rule.Tag)
 				}
 			}
 		}
@@ -105,6 +105,9 @@ func (t *Track) TitleAndDuration() (string, float64, error) {
 	return t.title, t.duration, nil
 }
 
+// getMetadataTags keys the tags lowercased for case-insensitive rule matching,
+// while tagOrder keeps the spelling of the file, so that a freeform MP4 atom is
+// not renamed from SERIES to series on the way into the m4b.
 func (t *Track) getMetadataTags(metadata string) (map[string]string, []string) {
 	var tags = make(map[string]string)
 
@@ -121,7 +124,7 @@ func (t *Track) getMetadataTags(metadata string) (map[string]string, []string) {
 
 		// Only add to tagOrder if this tag hasn't been seen before
 		if _, exists := tags[tagName]; !exists {
-			tagOrder = append(tagOrder, tagName)
+			tagOrder = append(tagOrder, split[0])
 		}
 
 		if len(split) == 1 {
