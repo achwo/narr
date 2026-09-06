@@ -55,8 +55,28 @@ func TestSanitizePathComponent(t *testing.T) {
 		expected string
 	}{
 		{name: "replaces ?", input: "Something With ???", expected: "Something With ___"},
+		{name: "replaces every ? individually", input: "Die drei ???", expected: "Die drei ___"},
 		{name: "does not replace .", input: "J.R.R. Tolkien", expected: "J.R.R. Tolkien"},
 		{name: "does not replace '", input: "Stanislawa d'Asp", expected: "Stanislawa d'Asp"},
+		{name: "keeps umlauts", input: "T\u00f6dliche Regie", expected: "T\u00f6dliche Regie"},
+		{name: "keeps sharp s", input: "Fu\u00dfball-Gangster", expected: "Fu\u00dfball-Gangster"},
+		{name: "keeps accents", input: "Andr\u00e9 \u00c7ak\u0131r", expected: "Andr\u00e9 \u00c7ak\u0131r"},
+		{name: "replaces colon", input: "Der Angstmann: Max Heller 1", expected: "Der Angstmann_ Max Heller 1"},
+		{name: "keeps ampersand", input: "H. P. Lovecraft & August Derleth", expected: "H. P. Lovecraft & August Derleth"},
+		{
+			name:     "keeps brackets and replaces colon",
+			input:    "Max Heller 1 - Der Angstmann [H\u00f6rbuch: X]",
+			expected: "Max Heller 1 - Der Angstmann [H\u00f6rbuch_ X]",
+		},
+		{name: "keeps parentheses", input: "Der Hobbit (Ungek\u00fcrzt)", expected: "Der Hobbit (Ungek\u00fcrzt)"},
+		{name: "keeps other harmless symbols", input: "A,B!C+D;E#F@G=H~I", expected: "A,B!C+D;E#F@G=H~I"},
+		{name: "replaces windows forbidden characters", input: `a<b>c:d"e/f\g|h?i*j`, expected: "a_b_c_d_e_f_g_h_i_j"},
+		{name: "replaces control characters", input: "a\x00b\x1fc", expected: "a_b_c"},
+		{name: "trims trailing spaces and dots", input: "Der Angstmann. ", expected: "Der Angstmann"},
+		{name: "normalizes to nfc", input: "To\u0308dliche Regie", expected: "T\u00f6dliche Regie"},
+		{name: "falls back to _ for empty result", input: "", expected: "_"},
+		{name: "replaces each forbidden character individually", input: "///", expected: "___"},
+		{name: "falls back to _ when only spaces and dots remain", input: " . ", expected: "_"},
 	}
 
 	for _, tt := range tests {

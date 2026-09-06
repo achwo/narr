@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"strings"
 	"unicode"
+
+	"golang.org/x/text/unicode/norm"
 )
 
 // ApplyRegex applies a regular expression pattern to an input string and formats the captured groups
@@ -51,10 +53,20 @@ func ApplyRegex(input string, regex *regexp.Regexp, format string) (string, erro
 	return newValue, nil
 }
 
-// SanitizePathComponent replaces unallowed symbols with _ from a path component
+var forbiddenPathChars = regexp.MustCompile(`[<>:"/\\|?*\x00-\x1f]`)
+
+// SanitizePathComponent replaces every character that is not allowed in a path
+// component on Windows, SMB or macOS with _ and returns the result in NFC form.
+// It never returns an empty string and never returns a name ending in a space or dot.
 func SanitizePathComponent(s string) string {
-	re := regexp.MustCompile(`[^a-zA-Z0-9 _.\-']`)
-	return re.ReplaceAllString(s, "_")
+	sanitized := forbiddenPathChars.ReplaceAllString(s, "_")
+	sanitized = strings.TrimRight(sanitized, " .")
+
+	if sanitized == "" {
+		return "_"
+	}
+
+	return norm.NFC.String(sanitized)
 }
 
 func ReplaceDirAndExt(file string, dir string, ext string) string {
