@@ -141,7 +141,7 @@ func NewProjectWithDeps(config ProjectConfig, deps ProjectDependencies) (*Projec
 // Returns an error if the configuration is invalid.
 func NewProject(config ProjectConfig) (*Project, error) {
 	audioFileProvider := &utils.OSAudioFileProvider{}
-	audioProcessor := &FFmpegAudioProcessor{Command: &ExecCommand{}}
+	audioProcessor := NewFFmpegAudioProcessor()
 	trackFactory := &FFmpegTrackFactory{AudioProcessor: audioProcessor}
 
 	deps := ProjectDependencies{

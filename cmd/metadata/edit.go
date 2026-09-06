@@ -35,10 +35,10 @@ var editCmd = &cobra.Command{
 			return fmt.Errorf("could not get files: %w", err)
 		}
 
-		audioProcesoor := &m4b.FFmpegAudioProcessor{}
+		audioProcessor := m4b.NewFFmpegAudioProcessor()
 
 		for _, file := range files {
-			metadata, err := audioProcesoor.ReadMetadata(file)
+			metadata, err := audioProcessor.ReadMetadata(file)
 			if err != nil {
 				return fmt.Errorf("failed to read metadata of %s: %w", file, err)
 			}
@@ -72,7 +72,7 @@ var editCmd = &cobra.Command{
 				fmt.Println("Changing metadata in file", file)
 			}
 
-			if err = audioProcesoor.WriteMetadata(file, updatedMetadata, verbose); err != nil {
+			if err = audioProcessor.WriteMetadata(file, updatedMetadata, verbose); err != nil {
 				return fmt.Errorf("could not write metadata: %w", err)
 			}
 

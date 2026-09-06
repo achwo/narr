@@ -9,6 +9,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestNewFFmpegAudioProcessor_Always_ReturnsProcessorWithCommand(t *testing.T) {
+	processor := NewFFmpegAudioProcessor()
+
+	require.Equal(t, &ExecCommand{}, processor.Command)
+}
+
 func TestFFmpegAudioProcessor_ToM4A(t *testing.T) {
 	fakeCommand := FakeCommand{}
 	processor := &FFmpegAudioProcessor{

@@ -4,6 +4,8 @@ import (
 	"reflect"
 	"regexp"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 var fullMetadata = `;FFMETADATA1
@@ -148,4 +150,112 @@ album=Other Bäumung`,
 			}
 		})
 	}
+}
+
+func TestParseFFMetadata_GlobalTags_ReturnsTagsInFileOrder(t *testing.T) {
+	parsed := ParseFFMetadata(fullMetadata)
+
+	assert.Equal(t, "123/Einfache Bäumung", parsed.Tags["title"])
+	assert.Equal(t, "Something With ???", parsed.Tags["album_artist"])
+	assert.Equal(
+		t,
+		[]string{
+			"major_brand", "minor_version", "compatible_brands", "title", "artist",
+			"album_artist", "album", "date", "disc", "track", "encoder",
+		},
+		parsed.TagOrder,
+	)
+	assert.Empty(t, parsed.Sections)
+}
+
+func TestParseFFMetadata_UppercaseTag_LowercasesTagName(t *testing.T) {
+	parsed := ParseFFMetadata(";FFMETADATA1\nTITLE=Some Title")
+
+	assert.Equal(t, "Some Title", parsed.Tags["title"])
+	assert.Equal(t, []string{"title"}, parsed.TagOrder)
+}
+
+func TestParseFFMetadata_EscapedValue_ReturnsUnescapedValue(t *testing.T) {
+	parsed := ParseFFMetadata(";FFMETADATA1\ntitle=a\\=b\\;c\\#d\\\\e")
+
+	assert.Equal(t, `a=b;c#d\e`, parsed.Tags["title"])
+}
+
+func TestParseFFMetadata_EscapedLineBreak_JoinsLines(t *testing.T) {
+	parsed := ParseFFMetadata(";FFMETADATA1\ntitle=first\\\nsecond\nalbum=Book")
+
+	assert.Equal(t, "first\nsecond", parsed.Tags["title"])
+	assert.Equal(t, "Book", parsed.Tags["album"])
+}
+
+func TestParseFFMetadata_ChapterSection_KeepsSectionVerbatim(t *testing.T) {
+	metadata := ";FFMETADATA1\ntitle=Book\n[CHAPTER]\nTIMEBASE=1/1000\nSTART=0\nEND=500\ntitle=Ch1\n"
+
+	parsed := ParseFFMetadata(metadata)
+
+	assert.Equal(t, map[string]string{"title": "Book"}, parsed.Tags)
+	assert.Equal(t, "[CHAPTER]\nTIMEBASE=1/1000\nSTART=0\nEND=500\ntitle=Ch1\n", parsed.Sections)
+}
+
+func TestParseFFMetadata_EmptyLines_AreIgnored(t *testing.T) {
+	parsed := ParseFFMetadata(";FFMETADATA1\ntitle=Book\n\n")
+
+	assert.Equal(t, []string{"title"}, parsed.TagOrder)
+}
+
+func TestFFMetadata_String_ParsedMetadata_RoundTrips(t *testing.T) {
+	metadata := ";FFMETADATA1\ntitle=a\\=b\nalbum=Book\n[CHAPTER]\nTIMEBASE=1/1000\nSTART=0\nEND=500\ntitle=Ch1\n"
+
+	parsed := ParseFFMetadata(metadata)
+
+	assert.Equal(t, metadata, parsed.String())
+}
+
+func TestFFMetadata_String_RemovedTag_OmitsTag(t *testing.T) {
+	parsed := ParseFFMetadata(";FFMETADATA1\ntitle=Book\nalbum=Album\n")
+	delete(parsed.Tags, "album")
+
+	assert.Equal(t, ";FFMETADATA1\ntitle=Book\n", parsed.String())
+}
+
+func TestFFMetadata_String_SpecialCharacters_EscapesValue(t *testing.T) {
+	parsed := ParseFFMetadata(";FFMETADATA1\n")
+	parsed.SetTag("title", "Folge 1; Teil 2 = Ende")
+
+	assert.Equal(t, ";FFMETADATA1\ntitle=Folge 1\\; Teil 2 \\= Ende\n", parsed.String())
+}
+
+func TestFFMetadata_SetTag_ExistingTag_KeepsOrder(t *testing.T) {
+	parsed := ParseFFMetadata(";FFMETADATA1\ntitle=Book\nalbum=Album\n")
+
+	parsed.SetTag("title", "Other")
+
+	assert.Equal(t, []string{"title", "album"}, parsed.TagOrder)
+	assert.Equal(t, "Other", parsed.Tags["title"])
+}
+
+func TestFFMetadata_SyncTagOrder_ChangedTags_DropsRemovedAndAppendsNew(t *testing.T) {
+	parsed := ParseFFMetadata(";FFMETADATA1\ntitle=Book\nalbum=Album\n")
+	delete(parsed.Tags, "album")
+	parsed.Tags["genre"] = "Hoerspiel"
+	parsed.Tags["comment"] = "Note"
+
+	parsed.SyncTagOrder()
+
+	assert.Equal(t, []string{"title", "comment", "genre"}, parsed.TagOrder)
+}
+
+func TestFFMetadata_Clone_ModifiedClone_LeavesOriginalUntouched(t *testing.T) {
+	parsed := ParseFFMetadata(";FFMETADATA1\ntitle=Book\n")
+
+	clone := parsed.Clone()
+	clone.SetTag("title", "Other")
+	clone.SetTag("album", "Album")
+
+	assert.Equal(t, "Book", parsed.Tags["title"])
+	assert.Equal(t, []string{"title"}, parsed.TagOrder)
+}
+
+func TestUnescapeFFMetadataValue_TrailingBackslash_KeepsBackslash(t *testing.T) {
+	assert.Equal(t, `abc\`, UnescapeFFMetadataValue(`abc\`))
 }
