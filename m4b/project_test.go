@@ -290,3 +290,130 @@ func (f *FakeAudioFileProvider) AudioFiles(fullPath string) ([]string, error) {
 	}
 	return f.Files, nil
 }
+
+func TestCheckCover_NoCoverPathAndNoEmbeddedCover_ReturnsError(t *testing.T) {
+	deps, _ := depsWithCover(false)
+	config := m4b.ProjectConfig{ProjectPath: "/books/the-book"}
+	project, err := m4b.NewProjectWithDeps(config, *deps)
+	require.NoError(t, err)
+
+	err = project.CheckCover()
+
+	require.EqualError(
+		t,
+		err,
+		"no cover for project /books/the-book: the first audio file file1.m4a has no embedded cover image "+
+			"and coverPath is empty in narr.yaml. Set coverPath to an image file, or embed a cover into the audio files",
+	)
+}
+
+func TestCheckCover_NoCoverPathAndEmbeddedCover_ReturnsNoError(t *testing.T) {
+	deps, _ := depsWithCover(true)
+	project, err := m4b.NewProjectWithDeps(m4b.ProjectConfig{}, *deps)
+	require.NoError(t, err)
+
+	require.NoError(t, project.CheckCover())
+}
+
+func TestCheckCover_CoverPathDoesNotExist_ReturnsError(t *testing.T) {
+	dir := t.TempDir()
+	deps, _ := depsWithCover(true)
+	config := m4b.ProjectConfig{ProjectPath: dir, CoverPath: "cover.jpg"}
+	project, err := m4b.NewProjectWithDeps(config, *deps)
+	require.NoError(t, err)
+
+	err = project.CheckCover()
+
+	require.EqualError(
+		t,
+		err,
+		"no cover for project "+dir+": coverPath in narr.yaml points to "+filepath.Join(dir, "cover.jpg")+
+			", which does not exist. Set coverPath to an existing image file, or leave it empty to use the cover "+
+			"embedded in the audio files",
+	)
+}
+
+func TestCheckCover_CoverPathIsDirectory_ReturnsError(t *testing.T) {
+	dir := t.TempDir()
+	deps, _ := depsWithCover(true)
+	config := m4b.ProjectConfig{ProjectPath: dir, CoverPath: "."}
+	project, err := m4b.NewProjectWithDeps(config, *deps)
+	require.NoError(t, err)
+
+	err = project.CheckCover()
+
+	require.ErrorContains(t, err, "which is a directory")
+}
+
+func TestCheckCover_CoverPathExists_ReturnsNoError(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "cover.jpg"), []byte("jpeg"), 0600))
+
+	deps, _ := depsWithCover(false)
+	config := m4b.ProjectConfig{ProjectPath: dir, CoverPath: "cover.jpg"}
+	project, err := m4b.NewProjectWithDeps(config, *deps)
+	require.NoError(t, err)
+
+	require.NoError(t, project.CheckCover())
+}
+
+func TestCover_CoverPathExists_ReturnsConfiguredPath(t *testing.T) {
+	dir := t.TempDir()
+	coverPath := filepath.Join(dir, "cover.jpg")
+	require.NoError(t, os.WriteFile(coverPath, []byte("jpeg"), 0600))
+
+	deps, _ := depsWithCover(false)
+	config := m4b.ProjectConfig{ProjectPath: dir, CoverPath: "cover.jpg"}
+	project, err := m4b.NewProjectWithDeps(config, *deps)
+	require.NoError(t, err)
+
+	cover, err := project.Cover()
+	require.NoError(t, err)
+
+	require.Equal(t, coverPath, cover)
+}
+
+func TestCover_NoCoverAvailable_ReturnsError(t *testing.T) {
+	deps, _ := depsWithCover(false)
+	project, err := m4b.NewProjectWithDeps(m4b.ProjectConfig{ProjectPath: "/books/the-book"}, *deps)
+	require.NoError(t, err)
+
+	_, err = project.Cover()
+
+	require.ErrorContains(t, err, "no cover for project /books/the-book")
+}
+
+func TestConvertToM4B_NoCoverAvailable_FailsBeforeConversion(t *testing.T) {
+	deps, processor := depsWithCover(false)
+	config := m4b.ProjectConfig{ProjectPath: t.TempDir(), ShouldConvert: true}
+	project, err := m4b.NewProjectWithDeps(config, *deps)
+	require.NoError(t, err)
+
+	_, err = project.ConvertToM4B()
+
+	require.ErrorContains(t, err, "has no embedded cover image")
+	require.Zero(t, processor.ToM4ACalls)
+}
+
+func depsWithCover(hasCover bool) (*m4b.ProjectDependencies, *m4b.NullAudioProcessor) {
+	data := map[string]m4b.FileData{
+		"file1.m4a": {
+			Title:    "Chapter 1",
+			Duration: 5000,
+			HasCover: hasCover,
+			Metadata: `;FFMETADATA1
+title=Chapter 1
+artist=Hans Wurst
+album=The Book
+track=1/16`,
+		},
+	}
+
+	processor := &m4b.NullAudioProcessor{Data: data}
+
+	return &m4b.ProjectDependencies{
+		AudioFileProvider: &FakeAudioFileProvider{Files: []string{"file1.m4a"}},
+		AudioProcessor:    processor,
+		TrackFactory:      &m4b.FFmpegTrackFactory{AudioProcessor: processor},
+	}, processor
+}

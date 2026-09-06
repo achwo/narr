@@ -5,6 +5,7 @@ type FileData struct {
 	Title    string  // Title of the audio file
 	Duration float64 // Duration in seconds
 	Metadata string  // Additional metadata
+	HasCover bool    // Whether the file has an embedded cover image
 }
 
 // NullAudioProcessor implements a no-op audio processor that returns empty/nil values.
@@ -15,11 +16,15 @@ type NullAudioProcessor struct {
 	ErrTitle error
 	ErrMeta  error
 	ErrWrite error
+	ErrCover error
+
+	ToM4ACalls int
 }
 
 // ToM4A is a no-op implementation that returns nil values.
 // It simulates converting audio files to M4A format.
 func (p *NullAudioProcessor) ToM4A(files []string, outputPath string) ([]string, error) {
+	p.ToM4ACalls++
 	return nil, nil
 }
 
@@ -38,6 +43,15 @@ func (p *NullAudioProcessor) AddChapters(m4bFile string, chapters string) error 
 // ExtractCover is a no-op implementation that returns nil values.
 func (p *NullAudioProcessor) ExtractCover(m4aFile string, workDir string) (string, error) {
 	return "", nil
+}
+
+// HasCoverStream returns the preconfigured cover flag for a file
+func (p *NullAudioProcessor) HasCoverStream(file string) (bool, error) {
+	if p.ErrCover != nil {
+		return false, p.ErrCover
+	}
+
+	return p.Data[file].HasCover, nil
 }
 
 // AddCover is a no-op implementation that returns nil values.
