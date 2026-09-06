@@ -165,6 +165,46 @@ func TestFFmpegAudioProcessor_ExtractCover(t *testing.T) {
 	require.True(t, fakeCommand.Cmd.Executed)
 }
 
+func TestFFmpegAudioProcessor_HasCoverStream_FileWithVideoStream_ReturnsTrue(t *testing.T) {
+	fakeCommand := FakeCommand{Stdout: "mjpeg\n"}
+	processor := &FFmpegAudioProcessor{Command: &fakeCommand}
+	inputFile := "filepath1.mp3"
+
+	hasCover, err := processor.HasCoverStream(inputFile)
+	require.NoError(t, err)
+
+	require.True(t, hasCover)
+
+	require.Len(t, fakeCommand.CreatedCommands, 1)
+	require.Equal(
+		t,
+		[]string{
+			"ffprobe",
+			"-v",
+			"error",
+			"-select_streams",
+			"v",
+			"-show_entries",
+			"stream=codec_name",
+			"-of",
+			"csv=p=0",
+			inputFile,
+		},
+		fakeCommand.CreatedCommands[0],
+	)
+	require.True(t, fakeCommand.Cmd.Executed)
+}
+
+func TestFFmpegAudioProcessor_HasCoverStream_FileWithoutVideoStream_ReturnsFalse(t *testing.T) {
+	fakeCommand := FakeCommand{Stdout: "\n"}
+	processor := &FFmpegAudioProcessor{Command: &fakeCommand}
+
+	hasCover, err := processor.HasCoverStream("filepath1.mp3")
+	require.NoError(t, err)
+
+	require.False(t, hasCover)
+}
+
 func TestFFmpegAudioProcessor_AddCover(t *testing.T) {
 	fakeCommand := FakeCommand{}
 	processor := &FFmpegAudioProcessor{Command: &fakeCommand}
@@ -212,6 +252,8 @@ type FakeCommand struct {
 	mu              sync.Mutex
 	CreatedCommands [][]string
 	Cmd             *FakeCmd
+	Stdout          string
+	Stderr          string
 }
 
 func (c *FakeCommand) Create(name string, args ...string) Cmd {
@@ -220,7 +262,7 @@ func (c *FakeCommand) Create(name string, args ...string) Cmd {
 
 	fullArgs := append([]string{name}, args...)
 	c.CreatedCommands = append(c.CreatedCommands, fullArgs)
-	c.Cmd = &FakeCmd{Stdout: "", Stderr: "", Executed: false}
+	c.Cmd = &FakeCmd{Stdout: c.Stdout, Stderr: c.Stderr, Executed: false}
 	return c.Cmd
 }
 
@@ -230,12 +272,16 @@ type FakeCmd struct {
 	Executed bool
 }
 
-func (c *FakeCmd) Run(_, _ *bytes.Buffer) error {
+func (c *FakeCmd) Run(stdout, stderr *bytes.Buffer) error {
 	c.Executed = true
+	stdout.WriteString(c.Stdout)
+	stderr.WriteString(c.Stderr)
 	return nil
 }
 
-func (c *FakeCmd) RunI(_ *bytes.Reader, _, _ *bytes.Buffer) error {
+func (c *FakeCmd) RunI(_ *bytes.Reader, stdout, stderr *bytes.Buffer) error {
 	c.Executed = true
+	stdout.WriteString(c.Stdout)
+	stderr.WriteString(c.Stderr)
 	return nil
 }

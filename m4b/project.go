@@ -164,6 +164,7 @@ type audioProcessor interface {
 	AddMetadata(m4bFile string, metadata string, bookTitle string) error
 	AddCover(m4bFile string, coverFile string) error
 	ExtractCover(m4aFile string, workDir string) (string, error)
+	HasCoverStream(file string) (bool, error)
 	AddChapters(m4bFile string, chapters string) error
 	ReadTitleAndDuration(file string) (string, float64, error)
 	ReadMetadata(file string) (string, error)
@@ -222,10 +223,14 @@ func (p *Project) ConvertToM4B() (string, error) {
 		files = append(files, track.File)
 	}
 
-	// running chapters before conversion to prevent long wait before error
+	// running chapters and cover check before conversion to prevent long wait before error
 	chapters, err := p.Chapters()
 	if err != nil {
 		return "", fmt.Errorf("could not get chapters: %w", err)
+	}
+
+	if err := p.CheckCover(); err != nil {
+		return "", err
 	}
 
 	m4aFiles := files
@@ -293,24 +298,90 @@ func (p *Project) ConvertToM4B() (string, error) {
 }
 
 // Cover returns the path to the cover image for the audiobook.
-// It first checks for a cover specified in the configuration, then attempts to
-// extract a cover from the first audio file if no configuration cover exists.
+// It first checks for a cover specified in the configuration, then extracts the
+// cover embedded in the first audio file if no configuration cover exists.
+// Returns an error if no cover is available.
 func (p *Project) Cover() (string, error) {
-	coverFromConfig := p.Config.CoverPath
-	if !filepath.IsAbs(coverFromConfig) {
-		coverFromConfig = filepath.Join(p.Config.ProjectPath, coverFromConfig)
+	if err := p.CheckCover(); err != nil {
+		return "", err
 	}
 
-	if info, err := os.Stat(coverFromConfig); !errors.Is(err, os.ErrNotExist) && !info.IsDir() {
-		return coverFromConfig, nil
+	if p.Config.CoverPath != "" {
+		return p.configuredCoverPath(), nil
 	}
 
 	tracks, err := p.Tracks()
 	if err != nil {
 		return "", err
 	}
+
+	return p.deps.AudioProcessor.ExtractCover(tracks[0].File, p.workDir)
+}
+
+// CheckCover verifies that a cover image is available for the project, either
+// through the configured coverPath or embedded in the first audio file.
+// Returns an error explaining how to supply a cover if none is available.
+func (p *Project) CheckCover() error {
+	if p.Config.CoverPath != "" {
+		return p.checkConfiguredCover()
+	}
+
+	tracks, err := p.Tracks()
+	if err != nil {
+		return fmt.Errorf("could not load audio files: %w", err)
+	}
+
+	if len(tracks) == 0 {
+		return errors.New("no audio files found")
+	}
+
 	firstFile := tracks[0].File
-	return p.deps.AudioProcessor.ExtractCover(firstFile, p.workDir)
+
+	hasCover, err := p.deps.AudioProcessor.HasCoverStream(firstFile)
+	if err != nil {
+		return fmt.Errorf("could not check cover of %s: %w", firstFile, err)
+	}
+
+	if !hasCover {
+		return fmt.Errorf(
+			"no cover for project %s: the first audio file %s has no embedded cover image and coverPath is empty in narr.yaml. Set coverPath to an image file, or embed a cover into the audio files",
+			p.Config.ProjectPath,
+			firstFile,
+		)
+	}
+
+	return nil
+}
+
+func (p *Project) checkConfiguredCover() error {
+	coverPath := p.configuredCoverPath()
+
+	info, err := os.Stat(coverPath)
+	if err != nil {
+		return fmt.Errorf(
+			"no cover for project %s: coverPath in narr.yaml points to %s, which does not exist. Set coverPath to an existing image file, or leave it empty to use the cover embedded in the audio files",
+			p.Config.ProjectPath,
+			coverPath,
+		)
+	}
+
+	if info.IsDir() {
+		return fmt.Errorf(
+			"no cover for project %s: coverPath in narr.yaml points to %s, which is a directory. Set coverPath to an image file, or leave it empty to use the cover embedded in the audio files",
+			p.Config.ProjectPath,
+			coverPath,
+		)
+	}
+
+	return nil
+}
+
+func (p *Project) configuredCoverPath() string {
+	if filepath.IsAbs(p.Config.CoverPath) {
+		return p.Config.CoverPath
+	}
+
+	return filepath.Join(p.Config.ProjectPath, p.Config.CoverPath)
 }
 
 // Tracks returns a sorted list of all audio tracks in the project.

@@ -9,8 +9,9 @@ import (
 )
 
 var runCmd = &cobra.Command{
-	Use:   "run",
-	Short: "Convert to m4b",
+	Use:          "run",
+	Short:        "Convert to m4b",
+	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		recursive, _ := cmd.Flags().GetBool("recursive")
 

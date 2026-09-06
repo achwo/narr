@@ -1,6 +1,7 @@
 package m4b
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -40,8 +41,9 @@ var generateCmd = &cobra.Command{
 }
 
 var checkCmd = &cobra.Command{
-	Use:   "check <dir>",
-	Short: "Check config for validity",
+	Use:          "check <dir>",
+	Short:        "Check config for validity",
+	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		recursive, _ := cmd.Flags().GetBool("recursive")
 
@@ -55,6 +57,8 @@ var checkCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("could not create project(s): %w", err)
 		}
+
+		var coverErrors []error
 
 		for _, project := range projects {
 			fmt.Printf("\n# Project %s\n", project.Config.ProjectPath)
@@ -90,9 +94,19 @@ var checkCmd = &cobra.Command{
 				return fmt.Errorf("could not get filename: %w", err)
 			}
 			fmt.Println(filename)
+
+			fmt.Println("\n## Cover")
+			if err := project.CheckCover(); err != nil {
+				fmt.Println("missing")
+				coverErrors = append(coverErrors, err)
+			} else if project.Config.CoverPath != "" {
+				fmt.Println(project.Config.CoverPath)
+			} else {
+				fmt.Println("embedded in first audio file")
+			}
 		}
 
-		return nil
+		return errors.Join(coverErrors...)
 	},
 }
 

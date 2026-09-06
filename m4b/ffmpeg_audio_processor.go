@@ -248,6 +248,31 @@ func (p *FFmpegAudioProcessor) ExtractCover(m4aFile string, workDir string) (str
 	return coverFile, nil
 }
 
+// HasCoverStream reports whether the audio file contains an embedded cover image
+// It takes the audio file path and returns true if the file has a video stream
+func (p *FFmpegAudioProcessor) HasCoverStream(file string) (bool, error) {
+	cmd := p.Command.Create(
+		"ffprobe",
+		"-v",
+		"error",
+		"-select_streams",
+		"v",
+		"-show_entries",
+		"stream=codec_name",
+		"-of",
+		"csv=p=0",
+		file,
+	)
+
+	var out, errOut bytes.Buffer
+	if err := cmd.Run(&out, &errOut); err != nil {
+		fmt.Println(errOut.String())
+		return false, fmt.Errorf("could not probe streams of file %s: %w", file, err)
+	}
+
+	return strings.TrimSpace(out.String()) != "", nil
+}
+
 func (p *FFmpegAudioProcessor) createMetadataFile(m4bFile string, metadata string) (string, error) {
 	metadataFile := p.ChangeFileExtension(m4bFile, ".metadata")
 	if err := os.MkdirAll(filepath.Dir(metadataFile), 0755); err != nil {

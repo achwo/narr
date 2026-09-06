@@ -34,8 +34,9 @@ directory when it is omitted.
 
 - `narr m4b generate [dir]` — writes an empty `narr.yaml` into `dir`.
 - `narr m4b check [dir]` — prints input tracks, chapters (if `hasChapters`),
-  metadata and the resulting output filename, without writing anything.
-  `-r, --recursive` checks all projects below the path. The subcommands
+  metadata, the resulting output filename and the cover source, without writing
+  anything. It exits non-zero when no cover is available, listing every affected
+  project. `-r, --recursive` checks all projects below the path. The subcommands
   `check chapters`, `check metadata`, `check filename` and `check files` print
   only that one part for a single project.
 - `narr m4b run [dir]` — runs the conversion and writes the result to
@@ -88,7 +89,8 @@ Input files are picked up recursively below the project directory (`.m4a`, `.mp3
 
 ```yaml
 # Cover image for the m4b, absolute or relative to the project directory.
-# If it does not exist, the cover is extracted from the first audio file.
+# If left empty, the cover is extracted from the first audio file. Both `check`
+# and `run` fail early when the file is missing or no cover is embedded.
 coverPath: ""
 
 # Write chapter markers into the m4b (needs mp4chaps).
