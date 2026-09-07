@@ -30,6 +30,8 @@ go install
   and leaves the file unchanged rather than dropping the tag silently. Files without
   such tags do not need it. `mp4tags` from mp4v2 is not an alternative: it only
   writes the fixed iTunes key set and has no option for freeform atoms.
+  For `narr metadata apply` AtomicParsley also decides the runtime: with it, an
+  840 MB m4b is retagged in about a second, without it the file is remuxed.
 - With `shouldConvert: true`, narr encodes via `ffmpeg -c:a aac_at`, so the ffmpeg
   build must provide the AudioToolbox AAC encoder (macOS)
 
@@ -69,6 +71,10 @@ directory when it is omitted.
   would change the other copies as well. Each run ends with a summary of updated,
   unchanged, dry-run and skipped files. Freeform MP4 tags survive the run, see
   Prerequisites for the AtomicParsley requirement.
+  MP4 files (`.m4b`, `.m4a`) are patched with AtomicParsley, which only rewrites
+  the atoms of the changed tags and leaves chapters, cover and every other atom
+  alone. When AtomicParsley is missing or refuses the file, narr remuxes the file
+  with ffmpeg instead, which is slower and rewrites the whole container.
 
 ### file
 
