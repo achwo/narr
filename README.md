@@ -14,8 +14,8 @@ get a new file with the corrected data.
 go install
 ```
 
-`make install` does nothing: the Makefile's `install` target has no recipe, the
-`go install` line belongs to the `push` target.
+`make install` does the same, after running the audit and refusing a dirty
+working tree.
 
 ## Prerequisites
 
