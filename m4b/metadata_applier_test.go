@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/achwo/narr/m4b"
+	"github.com/achwo/narr/utils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -208,6 +209,61 @@ func TestMetadataApplier_ApplyToProject_SupportedFormats_AppliesToAllAudioFiles(
 		assert.Equal(t, m4b.StatusUpdated, result.Status)
 	}
 	assert.Len(t, processor.Written, len(audioFiles))
+}
+
+func TestMetadataApplier_ApplyToFile_ProcessorCanPatch_PatchesOnlyTheChangedTags(t *testing.T) {
+	metadata := ";FFMETADATA1\ntitle=Book\nSERIES=Die Reihe\ncomment=some note\n"
+	file, applier, processor := setupApplier(t, "file1.m4b", metadata)
+	patcher := &patchingProcessor{NullAudioProcessor: processor}
+	applier.AudioProcessor = patcher
+
+	rules := []m4b.MetadataRule{
+		{Type: "set", Tag: "series", Value: "Andere Reihe"},
+		{Type: "delete", Tag: "comment"},
+	}
+
+	result, err := applier.ApplyToFile(file, rules, m4b.ApplyOptions{})
+	require.NoError(t, err)
+
+	assert.Equal(t, m4b.StatusUpdated, result.Status)
+	assert.Equal(
+		t,
+		[]utils.TagWithValue{
+			{Tag: "SERIES", Value: "Andere Reihe"},
+			{Tag: "comment", Value: ""},
+		},
+		patcher.Patched[file],
+	)
+	assert.Empty(t, processor.Written, "a patched file must not be remuxed")
+}
+
+func TestMetadataApplier_ApplyToFile_PatchRefused_WritesTheWholeMetadata(t *testing.T) {
+	file, applier, processor := setupApplier(t, "file1.m4b", fileMetadata)
+	applier.AudioProcessor = &patchingProcessor{NullAudioProcessor: processor, Refuse: true}
+
+	rules := []m4b.MetadataRule{{Type: "set", Tag: "album", Value: "Another Book"}}
+
+	result, err := applier.ApplyToFile(file, rules, m4b.ApplyOptions{})
+	require.NoError(t, err)
+
+	assert.Equal(t, m4b.StatusUpdated, result.Status)
+	assert.Contains(t, processor.Written[file], "album=Another Book")
+}
+
+// patchingProcessor is a NullAudioProcessor that also patches tags in place.
+type patchingProcessor struct {
+	*m4b.NullAudioProcessor
+	Patched map[string][]utils.TagWithValue
+	Refuse  bool
+}
+
+func (p *patchingProcessor) PatchMP4Tags(file string, tags []utils.TagWithValue, _ bool) bool {
+	if p.Patched == nil {
+		p.Patched = make(map[string][]utils.TagWithValue)
+	}
+	p.Patched[file] = tags
+
+	return !p.Refuse
 }
 
 func setupApplier(t *testing.T, name string, metadata string) (string, *m4b.MetadataApplier, *m4b.NullAudioProcessor) {

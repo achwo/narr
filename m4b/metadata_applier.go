@@ -18,6 +18,14 @@ type metadataProcessor interface {
 	WriteMetadata(file string, metadata string, verbose bool) error
 }
 
+// mp4TagPatcher writes single tags of an MP4 file without rewriting the audio
+// stream. Whether that works for a file depends on its container and on the
+// tools at hand, so the patcher decides that itself and reports false when the
+// file has to go through WriteMetadata instead.
+type mp4TagPatcher interface {
+	PatchMP4Tags(file string, tags []utils.TagWithValue, verbose bool) bool
+}
+
 // ApplyOptions configures a metadata apply run.
 type ApplyOptions struct {
 	DryRun  bool
@@ -171,13 +179,40 @@ func (a *MetadataApplier) ApplyToFile(file string, rules []MetadataRule, opts Ap
 		return FileResult{File: file, Status: StatusSkippedHardLink, Changes: changes}, nil
 	}
 
-	if err := a.AudioProcessor.WriteMetadata(file, after.String(), opts.Verbose); err != nil {
+	if err := a.write(file, after, changes, opts.Verbose); err != nil {
 		return FileResult{File: file, Changes: changes}, fmt.Errorf("could not write metadata of %s: %w", file, err)
 	}
 
 	a.printf("Metadata successfully changed for file %s\n\n", file)
 
 	return FileResult{File: file, Status: StatusUpdated, Changes: changes}, nil
+}
+
+// write puts the new metadata into the file, patching only the changed tags
+// when the processor can do that, and rewriting the whole file otherwise.
+func (a *MetadataApplier) write(
+	file string,
+	after *utils.FFMetadata,
+	changes []TagChange,
+	verbose bool,
+) error {
+	if patcher, ok := a.AudioProcessor.(mp4TagPatcher); ok {
+		if patcher.PatchMP4Tags(file, changedTags(after, changes), verbose) {
+			return nil
+		}
+	}
+
+	return a.AudioProcessor.WriteMetadata(file, after.String(), verbose)
+}
+
+// changedTags returns the changed tags under the spelling they have in the
+// file, with an empty value for the deleted ones.
+func changedTags(after *utils.FFMetadata, changes []TagChange) []utils.TagWithValue {
+	tags := make([]utils.TagWithValue, 0, len(changes))
+	for _, change := range changes {
+		tags = append(tags, utils.TagWithValue{Tag: after.OriginalName(change.Tag), Value: change.After})
+	}
+	return tags
 }
 
 func (a *MetadataApplier) printf(format string, args ...any) {
