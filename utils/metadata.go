@@ -14,11 +14,6 @@ type TagWithValue struct {
 	Value string // The value associated with the tag
 }
 
-// Prefix returns the tag name with an equals sign appended
-func (t TagWithValue) Prefix() string {
-	return fmt.Sprintf("%s=", t.Tag)
-}
-
 // String returns the tag and value formatted as "tag=value"
 func (t TagWithValue) String() string {
 	return fmt.Sprintf("%s=%s", t.Tag, t.Value)
@@ -55,6 +50,9 @@ func GetMetadataTagValues(metadata string, tags []string) []TagWithValue {
 // current value matches the provided regular expression, it constructs a new
 // value using the format string and the capture groups from the regex.
 //
+// Only the global tags are touched: everything from the first section header
+// ([CHAPTER], [STREAM]) onwards is left as it is.
+//
 // Parameters:
 //   - metadata: The full metadata string where fields are located.
 //   - tags: A list of tags on which the substitution is applied.
@@ -70,27 +68,38 @@ func UpdateMetadataTags(
 	format string,
 ) (string, []Diff) {
 	var affectedLines []Diff
-	tagsWithValue := GetMetadataTagValues(metadata, tags)
 
-	for _, currentValue := range tagsWithValue {
-		newValue, err := ApplyRegex(currentValue.Value, regex, format)
-		if err != nil {
-			continue
+	lines := strings.Split(metadata, "\n")
+
+	for i, line := range lines {
+		if strings.HasPrefix(line, "[") {
+			break
 		}
 
-		metadata = strings.ReplaceAll(
-			metadata,
-			currentValue.String(),
-			currentValue.Prefix()+newValue,
-		)
+		for _, tag := range tags {
+			prefix := tag + "="
+			if !strings.HasPrefix(line, prefix) {
+				continue
+			}
 
-		affectedLines = append(affectedLines, Diff{
-			Tag:    currentValue.Tag,
-			Before: currentValue.Value,
-			After:  newValue,
-		})
+			currentValue := strings.TrimPrefix(line, prefix)
+			newValue, err := ApplyRegex(currentValue, regex, format)
+			if err != nil {
+				break
+			}
+
+			lines[i] = prefix + newValue
+
+			affectedLines = append(affectedLines, Diff{
+				Tag:    tag,
+				Before: currentValue,
+				After:  newValue,
+			})
+			break
+		}
 	}
-	return metadata, affectedLines
+
+	return strings.Join(lines, "\n"), affectedLines
 }
 
 // Diff represents a difference between two metadata values
