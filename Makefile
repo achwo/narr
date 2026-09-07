@@ -93,5 +93,5 @@ generate-test-files:
 
 ## install: install the app via go install
 .PHONY: install
-push: confirm audit no-dirty
+install: confirm audit no-dirty
 	go install
