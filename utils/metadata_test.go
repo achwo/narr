@@ -133,6 +133,38 @@ title=Folge 123: Einfache Bäumung
 album=Other Bäumung`,
 		},
 		{
+			name: "two tags with the same value, only one is requested",
+			metadata: `;FFMETADATA1
+artist=Helge Schneider
+album_artist=Helge Schneider`,
+			tags:   []string{"artist"},
+			regex:  regexp.MustCompile(`^(.+)$`),
+			format: "%s (Autor)",
+			expected: `;FFMETADATA1
+artist=Helge Schneider (Autor)
+album_artist=Helge Schneider`,
+		},
+		{
+			name: "chapter with the same title as the requested tag",
+			metadata: `;FFMETADATA1
+title=Folge 1
+[CHAPTER]
+TIMEBASE=1/1000
+START=0
+END=500
+title=Folge 1`,
+			tags:   []string{"title"},
+			regex:  regexp.MustCompile(`^Folge (\d+)$`),
+			format: "%s. Folge",
+			expected: `;FFMETADATA1
+title=1. Folge
+[CHAPTER]
+TIMEBASE=1/1000
+START=0
+END=500
+title=Folge 1`,
+		},
+		{
 			name:     "only one format string",
 			metadata: `title=Und der hunger`,
 			tags:     []string{"title"},
