@@ -19,46 +19,6 @@ func (p *OSAudioFileProvider) AudioFiles(fullPath string) ([]string, error) {
 	return GetFilesByExtensions(fullPath, []string{".m4a", ".mp3", ".flac"})
 }
 
-// GetValidFilePathFromArgs retrieves and validates a file path from command line arguments.
-// It returns an error if the path at the given index doesn't exist or is a directory.
-func GetValidFilePathFromArgs(args []string, index int) (string, error) {
-	path, err := GetValidFullpathFromArgs(args, index)
-	if err != nil {
-		return "", err
-	}
-
-	fileInfo, err := os.Stat(path)
-	if err != nil {
-		return "", err
-	}
-
-	if fileInfo.IsDir() {
-		return "", fmt.Errorf("%s is not a directory", path)
-	}
-
-	return path, nil
-}
-
-// GetValidDirPathFromArgs retrieves and validates a directory path from command line arguments.
-// It returns an error if the path at the given index doesn't exist or is not a directory.
-func GetValidDirPathFromArgs(args []string, index int) (string, error) {
-	path, err := GetValidFullpathFromArgs(args, index)
-	if err != nil {
-		return "", err
-	}
-
-	fileInfo, err := os.Stat(path)
-	if err != nil {
-		return "", err
-	}
-
-	if !fileInfo.IsDir() {
-		return "", fmt.Errorf("%s is not a directory", path)
-	}
-
-	return path, nil
-}
-
 // GetValidFullpathFromArgs retrieves a path from command line arguments and converts it to an absolute path.
 // It returns an error if the index is out of bounds or the path conversion fails.
 func GetValidFullpathFromArgs(args []string, index int) (string, error) {
