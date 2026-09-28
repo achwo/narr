@@ -2,14 +2,15 @@ package m4b
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
-
-	"github.com/achwo/narr/utils"
+	"sync"
+	"syscall"
 )
 
 // FFmpegAudioProcessor handles audio file processing operations using FFmpeg
@@ -23,111 +24,85 @@ func NewFFmpegAudioProcessor() *FFmpegAudioProcessor {
 	return &FFmpegAudioProcessor{Command: &ExecCommand{}}
 }
 
-// ToM4A converts audio files to M4A format using FFmpeg
-// It takes a slice of input file paths and an output directory path
-// Returns a slice of converted file paths or an error
-func (p *FFmpegAudioProcessor) ToM4A(files []string, outputPath string) ([]string, error) {
-	outInOrder := make([]string, 0, len(files))
-
-	for _, file := range files {
-		outFile := utils.ReplaceDirAndExt(file, outputPath, ".m4a")
-		outInOrder = append(outInOrder, outFile)
-	}
-
-	const numWorkers = 5
-
-	in := make(chan string, numWorkers)
-	out := make(chan string, numWorkers)
-	errs := make(chan error, numWorkers)
-
-	for i := 0; i < numWorkers; i++ {
-		go p.convertToM4AWorker(in, out, errs, outputPath)
-	}
-
-	go func() {
-		for _, file := range files {
-			in <- file
-		}
-		close(in)
-	}()
-
-	for i := 0; i < len(files); i++ {
-		select {
-		case <-out:
-			fmt.Print(".")
-		case err := <-errs:
-			return nil, fmt.Errorf("could not convert track: %w", err)
-		}
-	}
-
-	fmt.Println()
-	return outInOrder, nil
-}
-
-func (p *FFmpegAudioProcessor) convertToM4AWorker(
-	in <-chan string,
-	out chan<- string,
-	error chan<- error,
-	outputPath string,
-) {
-	for file := range in {
-		outFile := utils.ReplaceDirAndExt(file, outputPath, ".m4a")
-		cmd := p.Command.Create("ffmpeg", "-i", file, "-c:a", "aac_at", "-vn", outFile)
-
-		var outBuf bytes.Buffer
-		err := cmd.Run(&outBuf, &outBuf)
-		if err != nil {
-			fmt.Println(outBuf.String())
-			error <- fmt.Errorf("could not convert file %s:, %w", outFile, err)
-			continue
-		}
-
-		out <- outFile
-	}
-}
-
-// Concat concatenates multiple audio files into a single M4B file
-// It takes input files, a temporary filelist path, and an output directory
-// Returns the path to the concatenated file or an error
-func (p *FFmpegAudioProcessor) Concat(files []string, filelistFile string, outputPath string) (string, error) {
-	fileListContent := p.filelistFileContent(files)
-	err := os.WriteFile(filelistFile, []byte(fileListContent), 0600)
-	if err != nil {
-		return "", fmt.Errorf("could not write filelist file: %w", err)
-	}
-
-	outputFilepath := filepath.Join(outputPath, "concat.m4b")
+// CopyToM4B copies the audio of a single file into an M4B file without encoding it
+// It takes the input file and an output directory
+// Returns the path to the created M4B file or an error
+func (p *FFmpegAudioProcessor) CopyToM4B(file string, outputPath string) (string, error) {
+	outputFilepath := filepath.Join(outputPath, "copy.m4b")
 
 	cmd := p.Command.Create(
 		"ffmpeg",
-		"-f",
-		"concat",
-		"-safe",
-		"0",
 		"-i",
-		filelistFile,
+		file,
+		"-map",
+		"0:a:0",
+		"-map_chapters",
+		"-1",
 		"-c",
 		"copy",
-		"-vn",
 		outputFilepath,
 	)
 	var outBuf bytes.Buffer
-	err = cmd.Run(&outBuf, &outBuf)
-	if err != nil {
+	if err := cmd.Run(&outBuf, &outBuf); err != nil {
 		fmt.Println(outBuf.String())
-		return "", fmt.Errorf("could not concat files: %w", err)
+		return "", fmt.Errorf("could not copy file: %w", err)
 	}
 
 	return outputFilepath, nil
 }
 
-func (p *FFmpegAudioProcessor) filelistFileContent(files []string) string {
-	var sb strings.Builder
-	for _, file := range files {
-		escapedPath := strings.ReplaceAll(file, "'", "'\\''")
-		fmt.Fprintf(&sb, "file '%s'\n", escapedPath)
+// ConcatAndEncode decodes all files, joins them and encodes the result once
+// It takes the input files and an output directory
+// Returns the path to the created M4B file or an error
+func (p *FFmpegAudioProcessor) ConcatAndEncode(files []string, outputPath string) (string, error) {
+	if err := passOpenFileLimitToChildren(); err != nil {
+		return "", err
 	}
-	return sb.String()
+
+	outputFilepath := filepath.Join(outputPath, "concat.m4b")
+
+	args := make([]string, 0, 2*len(files)+9)
+	var inputLabels strings.Builder
+	for i, file := range files {
+		args = append(args, "-i", file)
+		fmt.Fprintf(&inputLabels, "[%d:a:0]", i)
+	}
+
+	args = append(
+		args,
+		"-filter_complex",
+		fmt.Sprintf("%sconcat=n=%d:v=0:a=1[a]", inputLabels.String(), len(files)),
+		"-map",
+		"[a]",
+		"-map_chapters",
+		"-1",
+		"-c:a",
+		"aac_at",
+		outputFilepath,
+	)
+
+	cmd := p.Command.Create("ffmpeg", args...)
+	var outBuf bytes.Buffer
+	if err := cmd.Run(&outBuf, &outBuf); err != nil {
+		fmt.Println(outBuf.String())
+		return "", fmt.Errorf("could not concat and encode files: %w", err)
+	}
+
+	return outputFilepath, nil
+}
+
+func passOpenFileLimitToChildren() error {
+	var limit syscall.Rlimit
+	if err := syscall.Getrlimit(syscall.RLIMIT_NOFILE, &limit); err != nil {
+		return fmt.Errorf("could not read open file limit: %w", err)
+	}
+
+	// Without an explicit Setrlimit, Go hands child processes the original, lower limit.
+	if err := syscall.Setrlimit(syscall.RLIMIT_NOFILE, &limit); err != nil {
+		return fmt.Errorf("could not set open file limit: %w", err)
+	}
+
+	return nil
 }
 
 // AddChapters adds chapter markers to an M4B file using mp4chaps
@@ -348,6 +323,56 @@ func (p *FFmpegAudioProcessor) ReadTitleAndDuration(file string) (string, float6
 	}
 
 	return title, duration, nil
+}
+
+// ReadDecodedDurations decodes the first audio stream of each file, five at a time
+// Returns the decoded durations in seconds, in the order of the files
+// They can differ from the durations the containers state
+func (p *FFmpegAudioProcessor) ReadDecodedDurations(files []string) ([]float64, error) {
+	durations := make([]float64, len(files))
+	errs := make([]error, len(files))
+
+	var wg sync.WaitGroup
+	slots := make(chan struct{}, 5)
+
+	for i, file := range files {
+		wg.Add(1)
+		slots <- struct{}{}
+		go func() {
+			defer wg.Done()
+			durations[i], errs[i] = p.readDecodedDuration(file)
+			<-slots
+		}()
+	}
+	wg.Wait()
+
+	if err := errors.Join(errs...); err != nil {
+		return nil, err
+	}
+	return durations, nil
+}
+
+func (p *FFmpegAudioProcessor) readDecodedDuration(file string) (float64, error) {
+	cmd := p.Command.Create("ffmpeg", "-v", "error", "-progress", "pipe:1", "-i", file, "-map", "0:a:0", "-f", "null", "-")
+
+	var out, errOut bytes.Buffer
+	if err := cmd.Run(&out, &errOut); err != nil {
+		fmt.Println(errOut.String())
+		return 0, fmt.Errorf("could not decode %s: %w", file, err)
+	}
+
+	outTimeRegex := regexp.MustCompile(`out_time_us=(\d+)`)
+	matches := outTimeRegex.FindAllStringSubmatch(out.String(), -1)
+	if len(matches) == 0 {
+		return 0, fmt.Errorf("no decoded duration for %s", file)
+	}
+
+	microseconds, err := strconv.ParseInt(matches[len(matches)-1][1], 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("invalid decoded duration for %s: %w", file, err)
+	}
+
+	return float64(microseconds) / 1e6, nil
 }
 
 // WriteMetadata updates the metadata in the file

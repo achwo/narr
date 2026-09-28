@@ -101,8 +101,8 @@ func (t *Track) MetadataTag(tag string) (string, bool) {
 	return value, exists
 }
 
-func (t *Track) TitleAndDuration() (string, float64, error) {
-	return t.title, t.duration, nil
+func (t *Track) Title() string {
+	return t.title
 }
 
 // getMetadataTags keys the tags lowercased for case-insensitive rule matching,

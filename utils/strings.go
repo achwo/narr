@@ -2,8 +2,6 @@ package utils
 
 import (
 	"fmt"
-	"path"
-	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -67,12 +65,6 @@ func SanitizePathComponent(s string) string {
 	}
 
 	return norm.NFC.String(sanitized)
-}
-
-func ReplaceDirAndExt(file string, dir string, ext string) string {
-	fileName := filepath.Base(file)
-	fileName = strings.TrimSuffix(fileName, filepath.Ext(file)) + ".m4a"
-	return path.Join(dir, fileName)
 }
 
 // NaturalCompare compares two strings using natural sort order (numbers are compared numerically).

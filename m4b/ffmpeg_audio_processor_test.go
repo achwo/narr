@@ -17,62 +17,75 @@ func TestNewFFmpegAudioProcessor_Always_ReturnsProcessorWithCommand(t *testing.T
 	require.Equal(t, &ExecCommand{}, processor.Command)
 }
 
-func TestFFmpegAudioProcessor_ToM4A(t *testing.T) {
+func TestFFmpegAudioProcessor_ConcatAndEncode_ThreeFiles_EncodesThemInOnePass(t *testing.T) {
 	fakeCommand := FakeCommand{}
-	processor := &FFmpegAudioProcessor{
-		Command: &fakeCommand,
-	}
-	inputFiles := []string{"filepath1.m4a", "filepath2.m4a"}
-	output := "./output"
+	processor := &FFmpegAudioProcessor{Command: &fakeCommand}
 
-	files, err := processor.ToM4A(inputFiles, output)
+	result, err := processor.ConcatAndEncode([]string{"a.mp3", "b's.flac", "c.m4a"}, "./output")
 	require.NoError(t, err)
 
-	require.ElementsMatch(
+	require.Equal(t, "output/concat.m4b", result)
+	require.Equal(
 		t,
-		[][]string{
-			{"ffmpeg", "-i", "filepath1.m4a", "-c:a", "aac_at", "-vn", "output/filepath1.m4a"},
-			{"ffmpeg", "-i", "filepath2.m4a", "-c:a", "aac_at", "-vn", "output/filepath2.m4a"},
-		},
+		[][]string{{
+			"ffmpeg",
+			"-i", "a.mp3",
+			"-i", "b's.flac",
+			"-i", "c.m4a",
+			"-filter_complex", "[0:a:0][1:a:0][2:a:0]concat=n=3:v=0:a=1[a]",
+			"-map", "[a]",
+			"-map_chapters", "-1",
+			"-c:a", "aac_at",
+			"output/concat.m4b",
+		}},
 		fakeCommand.CreatedCommands,
 	)
-	require.ElementsMatch(
-		t,
-		[]string{"output/filepath1.m4a", "output/filepath2.m4a"},
-		files,
-	)
-
 	require.True(t, fakeCommand.Cmd.Executed)
 }
 
-func TestFFmpegAudioProcessor_Concat(t *testing.T) {
+func TestFFmpegAudioProcessor_CopyToM4B_OneFile_CopiesItsAudioWithoutEncoding(t *testing.T) {
 	fakeCommand := FakeCommand{}
-	processor := &FFmpegAudioProcessor{
-		Command: &fakeCommand,
-	}
-	inputFiles := []string{"filepath'1.m4a", "filepath2.m4a"}
-	outputPath := "./output"
+	processor := &FFmpegAudioProcessor{Command: &fakeCommand}
 
-	filelistFile, err := os.CreateTemp("", "filelist")
-	require.NoError(t, err)
-	defer os.Remove(filelistFile.Name())
-
-	result, err := processor.Concat(inputFiles, filelistFile.Name(), outputPath)
+	result, err := processor.CopyToM4B("a.m4a", "./output")
 	require.NoError(t, err)
 
-	expectedFilelistContent := "file 'filepath'\\''1.m4a'\nfile 'filepath2.m4a'\n"
-
-	actualContent, err := os.ReadFile(filelistFile.Name())
-	require.NoError(t, err)
-	require.Equal(t, expectedFilelistContent, string(actualContent))
-
-	require.Equal(t, "output/concat.m4b", result)
-
+	require.Equal(t, "output/copy.m4b", result)
 	require.Equal(
 		t,
-		[]string{"ffmpeg", "-f", "concat", "-safe", "0", "-i", filelistFile.Name(), "-c", "copy", "-vn", "output/concat.m4b"},
-		fakeCommand.CreatedCommands[0],
+		[][]string{{"ffmpeg", "-i", "a.m4a", "-map", "0:a:0", "-map_chapters", "-1", "-c", "copy", "output/copy.m4b"}},
+		fakeCommand.CreatedCommands,
 	)
+	require.True(t, fakeCommand.Cmd.Executed)
+}
+
+func TestFFmpegAudioProcessor_ReadDecodedDurations_ProgressOutput_ReturnsTheLastOutTime(t *testing.T) {
+	fakeCommand := FakeCommand{
+		Stdout: "out_time_us=1000000\nprogress=continue\nout_time_us=2005333\nprogress=end\n",
+	}
+	processor := &FFmpegAudioProcessor{Command: &fakeCommand}
+
+	durations, err := processor.ReadDecodedDurations([]string{"a.mp3", "b.flac"})
+	require.NoError(t, err)
+
+	require.Equal(t, []float64{2.005333, 2.005333}, durations)
+	require.ElementsMatch(
+		t,
+		[][]string{
+			{"ffmpeg", "-v", "error", "-progress", "pipe:1", "-i", "a.mp3", "-map", "0:a:0", "-f", "null", "-"},
+			{"ffmpeg", "-v", "error", "-progress", "pipe:1", "-i", "b.flac", "-map", "0:a:0", "-f", "null", "-"},
+		},
+		fakeCommand.CreatedCommands,
+	)
+}
+
+func TestFFmpegAudioProcessor_ReadDecodedDurations_NoOutTime_ReturnsError(t *testing.T) {
+	fakeCommand := FakeCommand{Stdout: "out_time_us=N/A\nprogress=end\n"}
+	processor := &FFmpegAudioProcessor{Command: &fakeCommand}
+
+	_, err := processor.ReadDecodedDurations([]string{"a.mp3"})
+
+	require.EqualError(t, err, "no decoded duration for a.mp3")
 }
 
 func TestFFmpegAudioProcessor_AddChapters(t *testing.T) {

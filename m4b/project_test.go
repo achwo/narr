@@ -1,6 +1,7 @@
 package m4b_test
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -439,7 +440,59 @@ func TestConvertToM4B_NoCoverAvailable_FailsBeforeConversion(t *testing.T) {
 	_, err = project.ConvertToM4B()
 
 	require.ErrorContains(t, err, "has no embedded cover image")
-	require.Zero(t, processor.ToM4ACalls)
+	require.Zero(t, processor.ConcatAndEncodeCalls)
+}
+
+func TestConvertToM4B_TwoFilesWithoutConversion_EncodesThemInOnePass(t *testing.T) {
+	processor := convert(t, []string{"file1.m4a", "file2.m4a"}, false)
+
+	require.Equal(t, 1, processor.ConcatAndEncodeCalls)
+	require.Zero(t, processor.CopyToM4BCalls)
+}
+
+func TestConvertToM4B_OneFileWithoutConversion_CopiesIt(t *testing.T) {
+	processor := convert(t, []string{"file1.m4a"}, false)
+
+	require.Equal(t, 1, processor.CopyToM4BCalls)
+	require.Zero(t, processor.ConcatAndEncodeCalls)
+}
+
+func TestConvertToM4B_OneFileWithConversion_EncodesIt(t *testing.T) {
+	processor := convert(t, []string{"file1.m4a"}, true)
+
+	require.Equal(t, 1, processor.ConcatAndEncodeCalls)
+	require.Zero(t, processor.CopyToM4BCalls)
+}
+
+func convert(t *testing.T, files []string, shouldConvert bool) *m4b.NullAudioProcessor {
+	t.Helper()
+	t.Setenv("HOME", t.TempDir())
+
+	data := make(map[string]m4b.FileData)
+	for i, file := range files {
+		data[file] = m4b.FileData{
+			Title:    "Chapter 1",
+			Duration: 5000,
+			HasCover: true,
+			Metadata: fmt.Sprintf(";FFMETADATA1\ntitle=Chapter 1\nartist=Hans Wurst\nalbum=The Book\ntrack=%d/16", i+1),
+		}
+	}
+
+	processor := &m4b.NullAudioProcessor{Data: data}
+	deps := m4b.ProjectDependencies{
+		AudioFileProvider: &FakeAudioFileProvider{Files: files},
+		AudioProcessor:    processor,
+		TrackFactory:      &m4b.FFmpegTrackFactory{AudioProcessor: processor},
+	}
+
+	config := m4b.ProjectConfig{ProjectPath: t.TempDir(), ShouldConvert: shouldConvert}
+	project, err := m4b.NewProjectWithDeps(config, deps)
+	require.NoError(t, err)
+
+	_, err = project.ConvertToM4B()
+	require.NoError(t, err)
+
+	return processor
 }
 
 func depsWithCover(hasCover bool) (*m4b.ProjectDependencies, *m4b.NullAudioProcessor) {

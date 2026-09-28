@@ -1,5 +1,10 @@
 package m4b
 
+import (
+	"os"
+	"path/filepath"
+)
+
 // FileData represents metadata about an audio file for testing
 type FileData struct {
 	Title    string  // Title of the audio file
@@ -18,20 +23,27 @@ type NullAudioProcessor struct {
 	ErrWrite error
 	ErrCover error
 
-	ToM4ACalls int
+	ConcatAndEncodeCalls int
+	CopyToM4BCalls       int
 }
 
-// ToM4A is a no-op implementation that returns nil values.
-// It simulates converting audio files to M4A format.
-func (p *NullAudioProcessor) ToM4A(files []string, outputPath string) ([]string, error) {
-	p.ToM4ACalls++
-	return nil, nil
+// ConcatAndEncode writes an empty M4B file into outputPath and returns its path.
+// It simulates decoding, joining and encoding multiple audio files at once.
+func (p *NullAudioProcessor) ConcatAndEncode(files []string, outputPath string) (string, error) {
+	p.ConcatAndEncodeCalls++
+	return emptyM4B(outputPath)
 }
 
-// Concat is a no-op implementation that returns empty values.
-// It simulates concatenating multiple audio files into a single file.
-func (p *NullAudioProcessor) Concat(files []string, filelistPath string, outputPath string) (string, error) {
-	return "", nil
+// CopyToM4B writes an empty M4B file into outputPath and returns its path.
+// It simulates copying the audio of a single file without encoding it.
+func (p *NullAudioProcessor) CopyToM4B(file string, outputPath string) (string, error) {
+	p.CopyToM4BCalls++
+	return emptyM4B(outputPath)
+}
+
+func emptyM4B(outputPath string) (string, error) {
+	file := filepath.Join(outputPath, "null.m4b")
+	return file, os.WriteFile(file, nil, 0600)
 }
 
 // AddChapters is a no-op implementation that returns nil.
@@ -73,6 +85,15 @@ func (p *NullAudioProcessor) ReadTitleAndDuration(file string) (string, float64,
 	data := p.Data[file]
 
 	return data.Title, data.Duration, nil
+}
+
+// ReadDecodedDurations returns the preconfigured durations for the files
+func (p *NullAudioProcessor) ReadDecodedDurations(files []string) ([]float64, error) {
+	durations := make([]float64, 0, len(files))
+	for _, file := range files {
+		durations = append(durations, p.Data[file].Duration)
+	}
+	return durations, nil
 }
 
 // WriteMetadata records the metadata instead of writing it to the file.

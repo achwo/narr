@@ -160,15 +160,16 @@ type audioFileProvider interface {
 // audioProcessor defines the interface for processing audio files, including
 // conversion, concatenation, and metadata manipulation operations.
 type audioProcessor interface {
-	Concat(m4aFiles []string, templateFilePath string, outputPath string) (string, error)
+	ConcatAndEncode(files []string, outputPath string) (string, error)
+	CopyToM4B(file string, outputPath string) (string, error)
 	AddMetadata(m4bFile string, metadata string, bookTitle string) error
 	AddCover(m4bFile string, coverFile string) error
 	ExtractCover(m4aFile string, workDir string) (string, error)
 	HasCoverStream(file string) (bool, error)
 	AddChapters(m4bFile string, chapters string) error
 	ReadTitleAndDuration(file string) (string, float64, error)
+	ReadDecodedDurations(files []string) ([]float64, error)
 	ReadMetadata(file string) (string, error)
-	ToM4A(files []string, outputPath string) ([]string, error)
 }
 
 type trackFactory interface {
@@ -193,7 +194,8 @@ type ProjectDependencies struct {
 }
 
 // ConvertToM4B processes all audio files in the project and creates a single M4B audiobook file.
-// It handles conversion to M4A, concatenation, and addition of metadata, cover art, and chapters.
+// It joins the files in one encoding pass, or copies a single file when ShouldConvert is false,
+// and adds metadata, cover art, and chapters.
 // Returns the path to the created M4B file and any error encountered during the process.
 func (p *Project) ConvertToM4B() (string, error) {
 	if workDir, err := os.MkdirTemp("", "convert"); err == nil {
@@ -217,39 +219,29 @@ func (p *Project) ConvertToM4B() (string, error) {
 		fmt.Println("Skipping, as already completed")
 		return finalFilename, nil
 	}
-	files := make([]string, 0, len(tracks))
-
-	for _, track := range tracks {
-		files = append(files, track.File)
-	}
+	files := trackFiles(tracks)
 
 	// running chapters and cover check before conversion to prevent long wait before error
-	chapters, err := p.Chapters()
-	if err != nil {
-		return "", fmt.Errorf("could not get chapters: %w", err)
+	var chapters string
+	if p.Config.HasChapters {
+		chapters, err = p.Chapters()
+		if err != nil {
+			return "", fmt.Errorf("could not get chapters: %w", err)
+		}
 	}
 
 	if err := p.CheckCover(); err != nil {
 		return "", err
 	}
 
-	m4aFiles := files
-	if p.Config.ShouldConvert {
-		fmt.Printf("Converting %d files to m4a\n", len(files))
-		m4aPath, err := p.m4aPath()
-		if err != nil {
-			return "", fmt.Errorf("could not create m4a path: %w", err)
-		}
-
-		m4aFiles, err = p.deps.AudioProcessor.ToM4A(files, m4aPath)
-
-		if err != nil {
-			return "", fmt.Errorf("could not convert files to m4a: %w", err)
-		}
+	var m4bFile string
+	if len(files) == 1 && !p.Config.ShouldConvert {
+		fmt.Println("Copying file")
+		m4bFile, err = p.deps.AudioProcessor.CopyToM4B(files[0], p.workDir)
+	} else {
+		fmt.Printf("Concating and encoding %d files\n", len(files))
+		m4bFile, err = p.deps.AudioProcessor.ConcatAndEncode(files, p.workDir)
 	}
-
-	fmt.Println("Concating files")
-	m4bFile, err := p.deps.AudioProcessor.Concat(m4aFiles, p.filelistFile(), p.workDir)
 	if err != nil {
 		return "", err
 	}
@@ -412,6 +404,14 @@ func (p *Project) Tracks() ([]Track, error) {
 	return tracks, nil
 }
 
+func trackFiles(tracks []Track) []string {
+	files := make([]string, 0, len(tracks))
+	for _, track := range tracks {
+		files = append(files, track.File)
+	}
+	return files
+}
+
 func sortTracks(a, b Track) int {
 	discI, discIExists := a.DiscNumber()
 	discJ, discJExists := b.DiscNumber()
@@ -438,16 +438,17 @@ func (p *Project) Chapters() (string, error) {
 		return "", fmt.Errorf("could not load audio files: %w", err)
 	}
 
+	durations, err := p.deps.AudioProcessor.ReadDecodedDurations(trackFiles(tracks))
+	if err != nil {
+		return "", fmt.Errorf("could not read decoded durations: %w", err)
+	}
+
 	chapters := make(map[string]*Chapter)
 	var chapterOrder []string
 	var previousChapter *Chapter
 
 	for i, track := range tracks {
-		title, duration, err := track.TitleAndDuration()
-		if err != nil {
-			return "", fmt.Errorf("could not read file data for file %s: %w", track.File, err)
-		}
-		chapterName := title
+		chapterName := track.Title()
 
 		for _, rule := range p.Config.ChapterRules {
 			chapterName, err = rule.Apply(chapterName)
@@ -457,7 +458,7 @@ func (p *Project) Chapters() (string, error) {
 		}
 
 		value, exists := chapters[chapterName]
-		newFile := File{Name: track.File, Duration: duration}
+		newFile := File{Name: track.File, Duration: durations[i]}
 
 		if exists {
 			value.addFile(newFile)
@@ -582,24 +583,6 @@ func (p *Project) getUpdatedMetadata() (map[string]string, []string, error) {
 	}
 
 	return metadata, tagOrder, nil
-}
-
-func (p *Project) m4aPath() (string, error) {
-	m4aPath := filepath.Join(p.workDir, "m4a")
-
-	if _, err := os.Stat(m4aPath); !errors.Is(err, os.ErrNotExist) {
-		return "", fmt.Errorf("m4a directory already exists: %s", m4aPath)
-	}
-
-	err := os.Mkdir(m4aPath, 0755)
-	if err != nil {
-		return "", err
-	}
-	return m4aPath, nil
-}
-
-func (p *Project) filelistFile() string {
-	return filepath.Join(p.workDir, "filelist.txt")
 }
 
 func (p *Project) AlreadyCompleted() bool {

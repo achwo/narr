@@ -32,8 +32,9 @@ working tree.
   writes the fixed iTunes key set and has no option for freeform atoms.
   For `narr metadata apply` AtomicParsley also decides the runtime: with it, an
   840 MB m4b is retagged in about a second, without it the file is remuxed.
-- With `shouldConvert: true`, narr encodes via `ffmpeg -c:a aac_at`, so the ffmpeg
-  build must provide the AudioToolbox AAC encoder (macOS)
+- Whenever narr encodes (a project with more than one file, or `shouldConvert: true`),
+  it uses `ffmpeg -c:a aac_at`, so the ffmpeg build must provide the AudioToolbox AAC
+  encoder (macOS)
 
 ## Commands
 
@@ -111,7 +112,8 @@ coverPath: ""
 # Write chapter markers into the m4b (needs mp4chaps).
 hasChapters: false
 
-# Re-encode the input files to aac before concatenating them.
+# Encode a single input file to aac instead of copying it. Several input files are
+# always decoded, joined and encoded once, so that no gaps end up at the seams.
 shouldConvert: true
 
 # Treat every subdirectory next to this file as a separate project with this config.
@@ -159,6 +161,8 @@ Regexes use Go regex syntax, so backslashes have to be escaped in YAML.
 
 Chapter titles are taken from the `title` tag of each track and then piped through
 all chapter rules. Tracks that end up with the same title form one chapter.
+Chapter marks are placed by the decoded length of the tracks, so `check` decodes
+every file when `hasChapters` is true.
 A chapter rule needs both `regex` and `format`, with the same `%s` semantics as a
 regex metadata rule:
 
