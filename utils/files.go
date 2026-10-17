@@ -2,7 +2,9 @@
 package utils
 
 import (
+	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -95,4 +97,63 @@ func HardLinkCount(path string) (uint64, error) {
 	}
 
 	return uint64(stat.Nlink), nil
+}
+
+// MoveFile moves src to dst. When src and dst are on different volumes, where a
+// rename fails with EXDEV, it copies src next to dst, renames the copy to dst and
+// removes src, so that dst never holds a partial file.
+func MoveFile(src string, dst string) error {
+	err := os.Rename(src, dst)
+	if !errors.Is(err, syscall.EXDEV) {
+		return err
+	}
+
+	if err := copyFile(src, dst); err != nil {
+		return err
+	}
+
+	if err := os.Remove(src); err != nil {
+		return fmt.Errorf("could not remove %s after copying it to %s: %w", src, dst, err)
+	}
+	return nil
+}
+
+func copyFile(src string, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return fmt.Errorf("could not open %s: %w", src, err)
+	}
+	defer in.Close()
+
+	info, err := in.Stat()
+	if err != nil {
+		return fmt.Errorf("could not stat %s: %w", src, err)
+	}
+
+	out, err := os.CreateTemp(filepath.Dir(dst), "."+filepath.Base(dst)+".*")
+	if err != nil {
+		return fmt.Errorf("could not create a copy next to %s: %w", dst, err)
+	}
+
+	if err := writeCopy(out, in, info.Mode().Perm()); err != nil {
+		os.Remove(out.Name())
+		return fmt.Errorf("could not copy %s to %s: %w", src, out.Name(), err)
+	}
+
+	if err := os.Rename(out.Name(), dst); err != nil {
+		os.Remove(out.Name())
+		return fmt.Errorf("could not rename %s to %s: %w", out.Name(), dst, err)
+	}
+	return nil
+}
+
+func writeCopy(out *os.File, in io.Reader, perm fs.FileMode) error {
+	_, err := io.Copy(out, in)
+	if err == nil {
+		err = out.Chmod(perm)
+	}
+	if err == nil {
+		err = out.Sync()
+	}
+	return errors.Join(err, out.Close())
 }

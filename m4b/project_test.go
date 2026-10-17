@@ -1,7 +1,9 @@
 package m4b_test
 
 import (
+	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -109,6 +111,17 @@ func TestFilename(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Equal(t, filepath.Join(home, "narr", "Hans Wurst_ read by George Washington/The Book_/The Book_.m4b"), filename)
+}
+
+func TestFilename_OutputRoot_PlacesTheFileBelowIt(t *testing.T) {
+	config := m4b.ProjectConfig{OutputRoot: "/srv/audio"}
+	project, err := m4b.NewProjectWithDeps(config, *setupDeps())
+	require.NoError(t, err)
+
+	filename, err := project.Filename()
+	require.NoError(t, err)
+
+	require.Equal(t, "/srv/audio/Hans Wurst_ read by George Washington/The Book_/The Book_.m4b", filename)
 }
 
 func TestFilename_AlbumArtistAndArtist_UsesAlbumArtist(t *testing.T) {
@@ -464,10 +477,31 @@ func TestConvertToM4B_OneFileWithConversion_EncodesIt(t *testing.T) {
 	require.Zero(t, processor.CopyToM4BCalls)
 }
 
+func TestConvertToM4B_Always_WritesProgressToTheProgressWriter(t *testing.T) {
+	var progress bytes.Buffer
+	project := partsProject(t, partsProcessor([]string{"file1.m4a", "file2.m4a"}), []string{"file1.m4a", "file2.m4a"}, &progress)
+
+	_, err := project.ConvertToM4B()
+	require.NoError(t, err)
+
+	require.Contains(t, progress.String(), "Concating and encoding 2 files\n")
+	require.Contains(t, progress.String(), "Adding cover to m4b\n")
+}
+
 func convert(t *testing.T, files []string, shouldConvert bool) *m4b.NullAudioProcessor {
 	t.Helper()
-	t.Setenv("HOME", t.TempDir())
 
+	processor := partsProcessor(files)
+	project := partsProject(t, processor, files, nil)
+	project.Config.ShouldConvert = shouldConvert
+
+	_, err := project.ConvertToM4B()
+	require.NoError(t, err)
+
+	return processor
+}
+
+func partsProcessor(files []string) *m4b.NullAudioProcessor {
 	data := make(map[string]m4b.FileData)
 	for i, file := range files {
 		data[file] = m4b.FileData{
@@ -478,21 +512,24 @@ func convert(t *testing.T, files []string, shouldConvert bool) *m4b.NullAudioPro
 		}
 	}
 
-	processor := &m4b.NullAudioProcessor{Data: data}
+	return &m4b.NullAudioProcessor{Data: data}
+}
+
+func partsProject(t *testing.T, processor *m4b.NullAudioProcessor, files []string, progress io.Writer) *m4b.Project {
+	t.Helper()
+
 	deps := m4b.ProjectDependencies{
 		AudioFileProvider: &FakeAudioFileProvider{Files: files},
 		AudioProcessor:    processor,
 		TrackFactory:      &m4b.FFmpegTrackFactory{AudioProcessor: processor},
+		Progress:          progress,
 	}
 
-	config := m4b.ProjectConfig{ProjectPath: t.TempDir(), ShouldConvert: shouldConvert}
+	config := m4b.ProjectConfig{ProjectPath: t.TempDir(), OutputRoot: t.TempDir(), ShouldConvert: true}
 	project, err := m4b.NewProjectWithDeps(config, deps)
 	require.NoError(t, err)
 
-	_, err = project.ConvertToM4B()
-	require.NoError(t, err)
-
-	return processor
+	return project
 }
 
 func depsWithCover(hasCover bool) (*m4b.ProjectDependencies, *m4b.NullAudioProcessor) {
@@ -516,4 +553,53 @@ track=1/16`,
 		AudioProcessor:    processor,
 		TrackFactory:      &m4b.FFmpegTrackFactory{AudioProcessor: processor},
 	}, processor
+}
+
+func TestNewProjectsFromPath_EmptyProjectPath_UsesTheDirOfTheConfig(t *testing.T) {
+	configDir := t.TempDir()
+
+	paths := projectPathsFromConfig(t, configDir, "shouldConvert: true\n")
+
+	require.Equal(t, []string{configDir}, paths)
+}
+
+func TestNewProjectsFromPath_RelativeProjectPath_ResolvesItAgainstTheDirOfTheConfig(t *testing.T) {
+	configDir := t.TempDir()
+
+	paths := projectPathsFromConfig(t, configDir, "projectPath: ../audio/Die Naht\n")
+
+	require.Equal(t, []string{filepath.Join(filepath.Dir(configDir), "audio", "Die Naht")}, paths)
+}
+
+func TestNewProjectsFromPath_AbsoluteProjectPath_UsesItAsGiven(t *testing.T) {
+	audioDir := t.TempDir()
+
+	paths := projectPathsFromConfig(t, t.TempDir(), "projectPath: "+audioDir+"\n")
+
+	require.Equal(t, []string{audioDir}, paths)
+}
+
+func TestNewProjectsFromPath_MultiWithProjectPath_UsesItsSubdirectories(t *testing.T) {
+	audioDir := t.TempDir()
+	require.NoError(t, os.Mkdir(filepath.Join(audioDir, "Folge 1"), 0755))
+	require.NoError(t, os.Mkdir(filepath.Join(audioDir, "Folge 2"), 0755))
+
+	paths := projectPathsFromConfig(t, t.TempDir(), "multi: true\nprojectPath: "+audioDir+"\n")
+
+	require.Equal(t, []string{filepath.Join(audioDir, "Folge 1"), filepath.Join(audioDir, "Folge 2")}, paths)
+}
+
+func projectPathsFromConfig(t *testing.T, configDir string, config string) []string {
+	t.Helper()
+
+	require.NoError(t, os.WriteFile(filepath.Join(configDir, "narr.yaml"), []byte(config), 0600))
+
+	projects, err := m4b.NewProjectsFromPath(configDir)
+	require.NoError(t, err)
+
+	paths := make([]string, 0, len(projects))
+	for _, project := range projects {
+		paths = append(paths, project.Config.ProjectPath)
+	}
+	return paths
 }

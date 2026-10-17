@@ -49,12 +49,19 @@ directory when it is omitted.
   anything. It exits non-zero when no cover is available, listing every affected
   project. `-r, --recursive` checks all projects below the path. The subcommands
   `check chapters`, `check metadata`, `check filename` and `check files` print
-  only that one part for a single project.
+  only that one part for a single project. `check` and `check filename` take
+  `--out` like `run` and show the path `run` would write to.
 - `narr m4b run [dir]` — runs the conversion and writes the result to
-  `~/narr/<album_artist>/<album>/<album>.m4b`, falling back to `artist` when
-  `album_artist` is missing or empty. `-r, --recursive` converts all projects
-  below the path. A project is skipped when the output file already exists and its
-  duration is within 5% of the summed input duration.
+  `<out>/<album_artist>/<album>/<album>.m4b`, falling back to `artist` when
+  `album_artist` is missing or empty. `--out <dir>` sets the output root, which
+  defaults to `~/narr`. `-r, --recursive` converts all projects below the path.
+  A project is skipped when the output file already exists and its duration is
+  within 5% of the summed input duration.
+
+  stdout carries only results: the path of each project's m4b, one per line, also
+  for skipped projects. Progress, diagnostics and the output of failed ffmpeg runs
+  go to stderr, so another program can run `narr m4b run --out <dir>` and read
+  the written paths from stdout.
 
 ### metadata
 
@@ -96,7 +103,8 @@ of the directory containing the audio files of the audiobook.
 4. Run `narr m4b check` to see tracks, chapters, metadata and output filename
    without executing anything.
 5. When you're satisfied with the output, run `narr m4b run`.
-6. When the conversion is done, find your output file(s) in `~/narr/`.
+6. When the conversion is done, find your output file(s) in `~/narr/`, or below
+   the directory given with `--out`.
 
 Input files are picked up recursively below the project directory (`.m4a`, `.mp3`,
 `.flac`) and sorted by disc number, then track number, then file name.
@@ -104,6 +112,11 @@ Input files are picked up recursively below the project directory (`.m4a`, `.mp3
 ### Project configuration
 
 ```yaml
+# Directory with the audio files, absolute or relative to this file. If left
+# empty, it is the directory of this file. This is the project directory that
+# the other paths are relative to.
+projectPath: ""
+
 # Cover image for the m4b, absolute or relative to the project directory.
 # If left empty, the cover is extracted from the first audio file. Both `check`
 # and `run` fail early when the file is missing or no cover is embedded.
@@ -116,7 +129,8 @@ hasChapters: false
 # always decoded, joined and encoded once, so that no gaps end up at the seams.
 shouldConvert: true
 
-# Treat every subdirectory next to this file as a separate project with this config.
+# Treat every subdirectory of the project directory as a separate project with
+# this config.
 multi: false
 
 # Rewrite metadata tags before they are used for m4b metadata, chapters and filename.
@@ -126,9 +140,8 @@ metadataRules: []
 chapterRules: []
 ```
 
-`ProjectConfig` also has a `projectPath` field, but narr sets it itself (the
-directory of the `narr.yaml`, or the respective subdirectory for `multi: true`);
-setting it in the file has no effect.
+With `projectPath` a `narr.yaml` can live outside the audio files, for example
+when another program writes it into a temporary directory.
 
 ### metadataRules
 

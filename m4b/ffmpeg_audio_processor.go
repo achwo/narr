@@ -44,8 +44,7 @@ func (p *FFmpegAudioProcessor) CopyToM4B(file string, outputPath string) (string
 	)
 	var outBuf bytes.Buffer
 	if err := cmd.Run(&outBuf, &outBuf); err != nil {
-		fmt.Println(outBuf.String())
-		return "", fmt.Errorf("could not copy file: %w", err)
+		return "", commandFailed("could not copy file", err, &outBuf)
 	}
 
 	return outputFilepath, nil
@@ -84,11 +83,14 @@ func (p *FFmpegAudioProcessor) ConcatAndEncode(files []string, outputPath string
 	cmd := p.Command.Create("ffmpeg", args...)
 	var outBuf bytes.Buffer
 	if err := cmd.Run(&outBuf, &outBuf); err != nil {
-		fmt.Println(outBuf.String())
-		return "", fmt.Errorf("could not concat and encode files: %w", err)
+		return "", commandFailed("could not concat and encode files", err, &outBuf)
 	}
 
 	return outputFilepath, nil
+}
+
+func commandFailed(description string, err error, output *bytes.Buffer) error {
+	return fmt.Errorf("%s: %w\n%s", description, err, strings.TrimSpace(output.String()))
 }
 
 func passOpenFileLimitToChildren() error {
@@ -116,8 +118,7 @@ func (p *FFmpegAudioProcessor) AddChapters(m4bFile string, chapters string) erro
 	var outBuf bytes.Buffer
 	err := cmd.Run(&outBuf, &outBuf)
 	if err != nil {
-		fmt.Println(outBuf.String())
-		return fmt.Errorf("could not import chapters: %w", err)
+		return commandFailed("could not import chapters", err, &outBuf)
 	}
 
 	// m4bfilename.chapters.txt
@@ -162,8 +163,7 @@ func (p *FFmpegAudioProcessor) AddCover(m4bFile string, coverFile string) error 
 	var outBuf bytes.Buffer
 	err = cmd.Run(&outBuf, &outBuf)
 	if err != nil {
-		fmt.Println(outBuf.String())
-		return fmt.Errorf("could not add cover: %w", err)
+		return commandFailed("could not add cover", err, &outBuf)
 	}
 
 	if err := p.preserveFreeformTags(m4bFile, tempFile, tagsBefore); err != nil {
@@ -207,8 +207,7 @@ func (p *FFmpegAudioProcessor) AddMetadata(m4bFile string, metadata string, book
 	var outBuf bytes.Buffer
 	err = cmd.Run(&outBuf, &outBuf)
 	if err != nil {
-		fmt.Println(outBuf.String())
-		return fmt.Errorf("could not add metadata: %w", err)
+		return commandFailed("could not add metadata", err, &outBuf)
 	}
 
 	if err := p.preserveFreeformTags(m4bFile, tempFile, metadata); err != nil {
@@ -233,8 +232,7 @@ func (p *FFmpegAudioProcessor) ExtractCover(m4aFile string, workDir string) (str
 	var outBuf bytes.Buffer
 	err := cmd.Run(&outBuf, &outBuf)
 	if err != nil {
-		fmt.Println(outBuf.String())
-		return "", fmt.Errorf("could not extract cover: %w", err)
+		return "", commandFailed("could not extract cover", err, &outBuf)
 	}
 
 	return coverFile, nil
@@ -258,8 +256,7 @@ func (p *FFmpegAudioProcessor) HasCoverStream(file string) (bool, error) {
 
 	var out, errOut bytes.Buffer
 	if err := cmd.Run(&out, &errOut); err != nil {
-		fmt.Println(errOut.String())
-		return false, fmt.Errorf("could not probe streams of file %s: %w", file, err)
+		return false, commandFailed("could not probe streams of file "+file, err, &errOut)
 	}
 
 	return strings.TrimSpace(out.String()) != "", nil
@@ -357,8 +354,7 @@ func (p *FFmpegAudioProcessor) readDecodedDuration(file string) (float64, error)
 
 	var out, errOut bytes.Buffer
 	if err := cmd.Run(&out, &errOut); err != nil {
-		fmt.Println(errOut.String())
-		return 0, fmt.Errorf("could not decode %s: %w", file, err)
+		return 0, commandFailed("could not decode "+file, err, &errOut)
 	}
 
 	outTimeRegex := regexp.MustCompile(`out_time_us=(\d+)`)
@@ -426,8 +422,7 @@ func (p *FFmpegAudioProcessor) ReadMetadata(path string) (string, error) {
 	var metadata, errout bytes.Buffer
 
 	if err := extractCmd.Run(&metadata, &errout); err != nil {
-		fmt.Println(errout.String())
-		return "", fmt.Errorf("failed to extract metadata for file %s: %w", path, err)
+		return "", commandFailed("failed to extract metadata for file "+path, err, &errout)
 	}
 
 	return metadata.String(), nil
