@@ -477,6 +477,71 @@ func TestConvertToM4B_OneFileWithConversion_EncodesIt(t *testing.T) {
 	require.Zero(t, processor.CopyToM4BCalls)
 }
 
+func TestConvertToM4B_JoinedFileUpTo50msShorter_WritesIt(t *testing.T) {
+	project, err := convertJoinedWithDrift(t, 16000, -0.049)
+	require.NoError(t, err)
+
+	requireOutputExists(t, project)
+}
+
+func TestConvertToM4B_JoinedFileMoreThan50msShorter_FailsAndWritesNothing(t *testing.T) {
+	project, err := convertJoinedWithDrift(t, 16000, -0.051)
+
+	require.EqualError(
+		t,
+		err,
+		"the joined file is 9999.949 s long, but the input files add up to 10000.000 s, "+
+			"which allows 9999.950 to 10000.114 s; audio was lost or added, so the result was discarded",
+	)
+	requireNoOutput(t, project)
+}
+
+func TestConvertToM4B_JoinedFileLongerBy50msPlusLessThanOneAacFrame_WritesIt(t *testing.T) {
+	project, err := convertJoinedWithDrift(t, 16000, 0.113)
+	require.NoError(t, err)
+
+	requireOutputExists(t, project)
+}
+
+func TestConvertToM4B_JoinedFileLongerBy50msPlusMoreThanOneAacFrame_FailsAndWritesNothing(t *testing.T) {
+	project, err := convertJoinedWithDrift(t, 16000, 0.115)
+
+	require.EqualError(
+		t,
+		err,
+		"the joined file is 10000.115 s long, but the input files add up to 10000.000 s, "+
+			"which allows 9999.950 to 10000.114 s; audio was lost or added, so the result was discarded",
+	)
+	requireNoOutput(t, project)
+}
+
+func convertJoinedWithDrift(t *testing.T, sampleRate int, drift float64) (*m4b.Project, error) {
+	t.Helper()
+
+	files := []string{"file1.m4a", "file2.m4a"}
+	processor := partsProcessor(files)
+	processor.SampleRate = sampleRate
+	processor.JoinDrift = drift
+	project := partsProject(t, processor, files, nil)
+
+	_, err := project.ConvertToM4B()
+	return project, err
+}
+
+func requireOutputExists(t *testing.T, project *m4b.Project) {
+	t.Helper()
+	filename, err := project.Filename()
+	require.NoError(t, err)
+	require.FileExists(t, filename)
+}
+
+func requireNoOutput(t *testing.T, project *m4b.Project) {
+	t.Helper()
+	filename, err := project.Filename()
+	require.NoError(t, err)
+	require.NoFileExists(t, filename)
+}
+
 func TestConvertToM4B_Always_WritesProgressToTheProgressWriter(t *testing.T) {
 	var progress bytes.Buffer
 	project := partsProject(t, partsProcessor([]string{"file1.m4a", "file2.m4a"}), []string{"file1.m4a", "file2.m4a"}, &progress)
@@ -512,7 +577,7 @@ func partsProcessor(files []string) *m4b.NullAudioProcessor {
 		}
 	}
 
-	return &m4b.NullAudioProcessor{Data: data}
+	return &m4b.NullAudioProcessor{Data: data, SampleRate: 48000}
 }
 
 func partsProject(t *testing.T, processor *m4b.NullAudioProcessor, files []string, progress io.Writer) *m4b.Project {

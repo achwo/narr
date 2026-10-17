@@ -75,6 +75,50 @@ func TestProject_ConvertToM4B_OneChapterPerMp3WithoutXingHeader_MarksSitWhereThe
 	}
 }
 
+func TestProject_ConvertToM4B_16kHzJoinPaddedBy1023Samples_WritesIt(t *testing.T) {
+	requireCommands(t, "ffmpeg", "ffprobe")
+
+	dir := t.TempDir()
+	_, parts := sinePartsAt(t, dir, 16000, []int{16384, 16385})
+
+	project := realProject(t, dir, parts, m4b.ProjectConfig{ShouldConvert: true})
+
+	result, err := project.ConvertToM4B()
+	require.NoError(t, err)
+
+	inputSamples := len(decodeSamples(t, parts[0])) + len(decodeSamples(t, parts[1]))
+	assert.Greater(t, len(decodeSamples(t, result))-inputSamples, 50*samplesPerMilli,
+		"the padding should exceed 50 ms, or the test does not cover it")
+}
+
+func TestProject_ConvertToM4B_16kHzJoinLoses62ms_FailsAndWritesNothing(t *testing.T) {
+	requireCommands(t, "ffmpeg", "ffprobe")
+
+	dir := t.TempDir()
+	_, parts := sinePartsAt(t, dir, 16000, []int{16384, 16384, 1000})
+
+	processor := m4b.NewFFmpegAudioProcessor()
+	config := m4b.ProjectConfig{
+		ProjectPath:   dir,
+		CoverPath:     coverImage(t, dir),
+		OutputRoot:    t.TempDir(),
+		ShouldConvert: true,
+	}
+	project, err := m4b.NewProjectWithDeps(config, m4b.ProjectDependencies{
+		AudioFileProvider: &FakeAudioFileProvider{Files: parts},
+		AudioProcessor:    lastPartDroppingProcessor{processor},
+		TrackFactory:      &m4b.FFmpegTrackFactory{AudioProcessor: processor},
+	})
+	require.NoError(t, err)
+
+	_, err = project.ConvertToM4B()
+
+	require.ErrorContains(t, err, "audio was lost or added")
+	filename, err := project.Filename()
+	require.NoError(t, err)
+	assert.NoFileExists(t, filename)
+}
+
 func TestProject_ConvertToM4B_SetRulesForSeriesAndPartInNarrYaml_WritesThemAsFreeformAtoms(t *testing.T) {
 	requireCommands(t, "ffmpeg", "ffprobe", m4b.AtomicParsleyCommand)
 
@@ -104,6 +148,14 @@ metadataRules:
 	atoms := run(t, m4b.AtomicParsleyCommand, result, "-t")
 	assert.Contains(t, atoms, `Atom "----" [com.apple.iTunes;SERIES] contains: Die Reihe`)
 	assert.Contains(t, atoms, `Atom "----" [com.apple.iTunes;PART] contains: 3`)
+}
+
+type lastPartDroppingProcessor struct {
+	*m4b.FFmpegAudioProcessor
+}
+
+func (p lastPartDroppingProcessor) ConcatAndEncode(files []string, outputPath string) (string, error) {
+	return p.FFmpegAudioProcessor.ConcatAndEncode(files[:len(files)-1], outputPath)
 }
 
 func encodeParts(t *testing.T, wavParts []string, ext string, codecArgs ...string) []string {
@@ -155,6 +207,11 @@ func assertSeamless(t *testing.T, original string, joined string, partSamples []
 
 func sineParts(t *testing.T, dir string, partSamples []int) (string, []string) {
 	t.Helper()
+	return sinePartsAt(t, dir, sampleRate, partSamples)
+}
+
+func sinePartsAt(t *testing.T, dir string, rate int, partSamples []int) (string, []string) {
+	t.Helper()
 
 	total := 0
 	for _, samples := range partSamples {
@@ -163,7 +220,7 @@ func sineParts(t *testing.T, dir string, partSamples []int) (string, []string) {
 
 	full := filepath.Join(dir, "full.wav")
 	run(t, "ffmpeg", "-v", "error", "-f", "lavfi",
-		"-i", fmt.Sprintf("sine=frequency=440:sample_rate=%d", sampleRate),
+		"-i", fmt.Sprintf("sine=frequency=440:sample_rate=%d", rate),
 		"-af", fmt.Sprintf("atrim=end_sample=%d", total),
 		"-ac", "2", full)
 

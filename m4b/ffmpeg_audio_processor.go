@@ -349,6 +349,34 @@ func (p *FFmpegAudioProcessor) ReadDecodedDurations(files []string) ([]float64, 
 	return durations, nil
 }
 
+// ReadSampleRate returns the sample rate of the first audio stream of a file in Hz
+func (p *FFmpegAudioProcessor) ReadSampleRate(file string) (int, error) {
+	cmd := p.Command.Create(
+		"ffprobe",
+		"-v",
+		"error",
+		"-select_streams",
+		"a:0",
+		"-show_entries",
+		"stream=sample_rate",
+		"-of",
+		"csv=p=0",
+		file,
+	)
+
+	var out, errOut bytes.Buffer
+	if err := cmd.Run(&out, &errOut); err != nil {
+		return 0, commandFailed("could not probe the sample rate of "+file, err, &errOut)
+	}
+
+	sampleRate, err := strconv.Atoi(strings.TrimSpace(out.String()))
+	if err != nil || sampleRate <= 0 {
+		return 0, fmt.Errorf("no valid sample rate for %s: %q", file, strings.TrimSpace(out.String()))
+	}
+
+	return sampleRate, nil
+}
+
 func (p *FFmpegAudioProcessor) readDecodedDuration(file string) (float64, error) {
 	cmd := p.Command.Create("ffmpeg", "-v", "error", "-progress", "pipe:1", "-i", file, "-map", "0:a:0", "-f", "null", "-")
 
