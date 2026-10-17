@@ -25,13 +25,32 @@ type NullAudioProcessor struct {
 
 	ConcatAndEncodeCalls int
 	CopyToM4BCalls       int
+	JoinDrift            float64
+	SampleRate           int
 }
 
 // ConcatAndEncode writes an empty M4B file into outputPath and returns its path.
-// It simulates decoding, joining and encoding multiple audio files at once.
+// It simulates decoding, joining and encoding multiple audio files at once: the
+// result is as long as the files together plus JoinDrift seconds.
 func (p *NullAudioProcessor) ConcatAndEncode(files []string, outputPath string) (string, error) {
 	p.ConcatAndEncodeCalls++
-	return emptyM4B(outputPath)
+
+	joined, err := emptyM4B(outputPath)
+	if err != nil {
+		return "", err
+	}
+
+	duration := p.JoinDrift
+	for _, file := range files {
+		duration += p.Data[file].Duration
+	}
+
+	if p.Data == nil {
+		p.Data = make(map[string]FileData)
+	}
+	p.Data[joined] = FileData{Duration: duration}
+
+	return joined, nil
 }
 
 // CopyToM4B writes an empty M4B file into outputPath and returns its path.
@@ -94,6 +113,11 @@ func (p *NullAudioProcessor) ReadDecodedDurations(files []string) ([]float64, er
 		durations = append(durations, p.Data[file].Duration)
 	}
 	return durations, nil
+}
+
+// ReadSampleRate returns the preconfigured SampleRate for every file
+func (p *NullAudioProcessor) ReadSampleRate(file string) (int, error) {
+	return p.SampleRate, nil
 }
 
 // WriteMetadata records the metadata instead of writing it to the file.

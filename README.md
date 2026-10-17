@@ -57,6 +57,10 @@ directory when it is omitted.
   defaults to `~/narr`. `-r, --recursive` converts all projects below the path.
   A project is skipped when the output file already exists and its duration is
   within 5% of the summed input duration.
+  When narr encodes, it decodes the result and the input files once more: if
+  the result is more than 50 ms shorter than the input files together, or
+  longer by more than 50 ms plus one AAC frame (1024 samples, the padding
+  `aac_at` keeps at the end), the run fails and the result is discarded.
 
   stdout carries only results: the path of each project's m4b, one per line, also
   for skipped projects. Progress, diagnostics and the output of failed ffmpeg runs

@@ -10,12 +10,18 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/achwo/narr/utils"
 	"gopkg.in/yaml.v3"
 )
 
 const configFileName = "narr.yaml"
+
+const (
+	joinTolerance   = 50 * time.Millisecond
+	aacFrameSamples = 1024
+)
 
 func NewProjectsByArgs(path string, recursive bool) ([]*Project, error) {
 	var projects []*Project
@@ -184,6 +190,7 @@ type audioProcessor interface {
 	AddChapters(m4bFile string, chapters string) error
 	ReadTitleAndDuration(file string) (string, float64, error)
 	ReadDecodedDurations(files []string) ([]float64, error)
+	ReadSampleRate(file string) (int, error)
 	ReadMetadata(file string) (string, error)
 }
 
@@ -211,8 +218,10 @@ type ProjectDependencies struct {
 
 // ConvertToM4B processes all audio files in the project and creates a single M4B audiobook file.
 // It joins the files in one encoding pass, or copies a single file when ShouldConvert is false,
-// and adds metadata, cover art, and chapters. Progress goes to the Progress writer of the
-// dependencies.
+// and adds metadata, cover art, and chapters. An encoded file whose decoded length is more than
+// 50 ms shorter than the summed decoded length of its parts, or longer by more than 50 ms plus
+// one AAC frame, is discarded with an error.
+// Progress goes to the Progress writer of the dependencies.
 // Returns the path to the created M4B file and any error encountered during the process.
 func (p *Project) ConvertToM4B() (string, error) {
 	if workDir, err := os.MkdirTemp("", "convert"); err == nil {
@@ -258,6 +267,10 @@ func (p *Project) ConvertToM4B() (string, error) {
 	} else {
 		p.progressf("Concating and encoding %d files\n", len(files))
 		m4bFile, err = p.deps.AudioProcessor.ConcatAndEncode(files, p.workDir)
+		if err == nil {
+			p.progressf("Comparing the decoded length with the parts\n")
+			err = p.checkJoinedLength(files, m4bFile)
+		}
 	}
 	if err != nil {
 		return "", err
@@ -304,6 +317,41 @@ func (p *Project) ConvertToM4B() (string, error) {
 	}
 
 	return finalFilename, nil
+}
+
+func (p *Project) checkJoinedLength(parts []string, joined string) error {
+	durations, err := p.deps.AudioProcessor.ReadDecodedDurations(append(slices.Clone(parts), joined))
+	if err != nil {
+		return fmt.Errorf("could not read decoded durations to check the joined file: %w", err)
+	}
+
+	partsTotal := 0.0
+	for _, duration := range durations[:len(parts)] {
+		partsTotal += duration
+	}
+	joinedLength := durations[len(parts)]
+
+	sampleRate, err := p.deps.AudioProcessor.ReadSampleRate(joined)
+	if err != nil {
+		return fmt.Errorf("could not read the sample rate to check the joined file: %w", err)
+	}
+
+	maxPadding := float64(aacFrameSamples) / float64(sampleRate)
+	shortest := partsTotal - joinTolerance.Seconds()
+	longest := partsTotal + joinTolerance.Seconds() + maxPadding
+
+	if joinedLength < shortest || joinedLength > longest {
+		return fmt.Errorf(
+			"the joined file is %.3f s long, but the input files add up to %.3f s, which allows %.3f to %.3f s; "+
+				"audio was lost or added, so the result was discarded",
+			joinedLength,
+			partsTotal,
+			shortest,
+			longest,
+		)
+	}
+
+	return nil
 }
 
 func (p *Project) progressf(format string, args ...any) {

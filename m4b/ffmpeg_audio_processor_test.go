@@ -88,6 +88,33 @@ func TestFFmpegAudioProcessor_ReadDecodedDurations_NoOutTime_ReturnsError(t *tes
 	require.EqualError(t, err, "no decoded duration for a.mp3")
 }
 
+func TestFFmpegAudioProcessor_ReadSampleRate_ProbeOutput_ReturnsTheRate(t *testing.T) {
+	fakeCommand := FakeCommand{Stdout: "16000\n"}
+	processor := &FFmpegAudioProcessor{Command: &fakeCommand}
+
+	sampleRate, err := processor.ReadSampleRate("joined.m4b")
+	require.NoError(t, err)
+
+	require.Equal(t, 16000, sampleRate)
+	require.Equal(
+		t,
+		[][]string{{
+			"ffprobe", "-v", "error", "-select_streams", "a:0",
+			"-show_entries", "stream=sample_rate", "-of", "csv=p=0", "joined.m4b",
+		}},
+		fakeCommand.CreatedCommands,
+	)
+}
+
+func TestFFmpegAudioProcessor_ReadSampleRate_NoAudioStream_ReturnsError(t *testing.T) {
+	fakeCommand := FakeCommand{Stdout: ""}
+	processor := &FFmpegAudioProcessor{Command: &fakeCommand}
+
+	_, err := processor.ReadSampleRate("cover.jpg")
+
+	require.EqualError(t, err, `no valid sample rate for cover.jpg: ""`)
+}
+
 func TestFFmpegAudioProcessor_AddChapters(t *testing.T) {
 	fakeCommand := FakeCommand{}
 	processor := &FFmpegAudioProcessor{Command: &fakeCommand}
