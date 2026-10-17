@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"errors"
 	"fmt"
+	"io"
 	"math"
 	"os"
 	"path/filepath"
@@ -56,6 +57,8 @@ func NewRecursiveProjectsFromPath(path string) ([]*Project, error) {
 // Depending on the config it might be:
 // - a single Project
 // - multiple Projects (when config Multi is true)
+// The audio files are taken from the projectPath of the config, resolved against
+// the directory of the narr.yaml, or from that directory when projectPath is empty.
 func NewProjectsFromPath(path string) ([]*Project, error) {
 	var fullpath string
 
@@ -70,8 +73,9 @@ func NewProjectsFromPath(path string) ([]*Project, error) {
 		return nil, fmt.Errorf("could not read config file %s: %w", fullpath, err)
 	}
 
+	baseDir := resolveProjectPath(config.ProjectPath, filepath.Dir(fullpath))
+
 	if config.Multi {
-		baseDir := filepath.Dir(fullpath)
 		projectDirEntries, err := os.ReadDir(baseDir)
 		if err != nil {
 			return nil, fmt.Errorf("could not get multi project directories: %w", err)
@@ -98,7 +102,7 @@ func NewProjectsFromPath(path string) ([]*Project, error) {
 		return projects, nil
 
 	} else {
-		config.ProjectPath = filepath.Dir(fullpath)
+		config.ProjectPath = baseDir
 
 		project, err := NewProject(*config)
 		if err != nil {
@@ -107,6 +111,16 @@ func NewProjectsFromPath(path string) ([]*Project, error) {
 
 		return []*Project{project}, nil
 	}
+}
+
+func resolveProjectPath(projectPath string, configDir string) string {
+	if projectPath == "" {
+		return configDir
+	}
+	if filepath.IsAbs(projectPath) {
+		return projectPath
+	}
+	return filepath.Join(configDir, projectPath)
 }
 
 func readConfig(fullpath string) (*ProjectConfig, error) {
@@ -148,6 +162,7 @@ func NewProject(config ProjectConfig) (*Project, error) {
 		AudioFileProvider: audioFileProvider,
 		AudioProcessor:    audioProcessor,
 		TrackFactory:      trackFactory,
+		Progress:          os.Stderr,
 	}
 	return NewProjectWithDeps(config, deps)
 }
@@ -191,11 +206,13 @@ type ProjectDependencies struct {
 	AudioFileProvider audioFileProvider
 	AudioProcessor    audioProcessor
 	TrackFactory      trackFactory
+	Progress          io.Writer
 }
 
 // ConvertToM4B processes all audio files in the project and creates a single M4B audiobook file.
 // It joins the files in one encoding pass, or copies a single file when ShouldConvert is false,
-// and adds metadata, cover art, and chapters.
+// and adds metadata, cover art, and chapters. Progress goes to the Progress writer of the
+// dependencies.
 // Returns the path to the created M4B file and any error encountered during the process.
 func (p *Project) ConvertToM4B() (string, error) {
 	if workDir, err := os.MkdirTemp("", "convert"); err == nil {
@@ -216,7 +233,7 @@ func (p *Project) ConvertToM4B() (string, error) {
 	}
 
 	if completed := p.AlreadyCompleted(); completed {
-		fmt.Println("Skipping, as already completed")
+		p.progressf("Skipping, as already completed\n")
 		return finalFilename, nil
 	}
 	files := trackFiles(tracks)
@@ -236,17 +253,17 @@ func (p *Project) ConvertToM4B() (string, error) {
 
 	var m4bFile string
 	if len(files) == 1 && !p.Config.ShouldConvert {
-		fmt.Println("Copying file")
+		p.progressf("Copying file\n")
 		m4bFile, err = p.deps.AudioProcessor.CopyToM4B(files[0], p.workDir)
 	} else {
-		fmt.Printf("Concating and encoding %d files\n", len(files))
+		p.progressf("Concating and encoding %d files\n", len(files))
 		m4bFile, err = p.deps.AudioProcessor.ConcatAndEncode(files, p.workDir)
 	}
 	if err != nil {
 		return "", err
 	}
 
-	fmt.Println("Adding metadata to m4b")
+	p.progressf("Adding metadata to m4b\n")
 	metadata, err := p.Metadata()
 	if err != nil {
 		return "", fmt.Errorf("could not get metadata for m4b: %w", err)
@@ -266,13 +283,13 @@ func (p *Project) ConvertToM4B() (string, error) {
 		return "", fmt.Errorf("could not get cover: %w", err)
 	}
 
-	fmt.Println("Adding cover to m4b")
+	p.progressf("Adding cover to m4b\n")
 	if err = p.deps.AudioProcessor.AddCover(m4bFile, cover); err != nil {
 		return "", fmt.Errorf("could not add cover to %s: %w", m4bFile, err)
 	}
 
 	if p.Config.HasChapters {
-		fmt.Println("Adding chapters to m4b")
+		p.progressf("Adding chapters to m4b\n")
 		if err = p.deps.AudioProcessor.AddChapters(m4bFile, chapters); err != nil {
 			return "", fmt.Errorf("could not add chapters to %s: %w", m4bFile, err)
 		}
@@ -282,11 +299,18 @@ func (p *Project) ConvertToM4B() (string, error) {
 		return "", fmt.Errorf("could not create target dir: %w", err)
 	}
 
-	if err = os.Rename(m4bFile, finalFilename); err != nil {
-		return "", fmt.Errorf("could not rename file: %w", err)
+	if err = utils.MoveFile(m4bFile, finalFilename); err != nil {
+		return "", fmt.Errorf("could not move file into %s: %w", finalFilename, err)
 	}
 
 	return finalFilename, nil
+}
+
+func (p *Project) progressf(format string, args ...any) {
+	if p.deps.Progress == nil {
+		return
+	}
+	fmt.Fprintf(p.deps.Progress, format, args...)
 }
 
 // Cover returns the path to the cover image for the audiobook.
@@ -522,8 +546,13 @@ func (p *Project) Filename() (string, error) {
 		return "", err
 	}
 
+	outputPath, err := p.Config.OutputPath()
+	if err != nil {
+		return "", err
+	}
+
 	filename := filepath.Join(
-		p.Config.OutputPath(),
+		outputPath,
 		utils.SanitizePathComponent(author),
 		utils.SanitizePathComponent(album),
 		utils.SanitizePathComponent(album)+".m4b",

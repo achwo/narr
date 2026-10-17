@@ -18,7 +18,7 @@ type ProjectConfig struct {
 	ShouldConvert bool           `yaml:"shouldConvert"`
 	Multi         bool           `yaml:"multi"`
 	ProjectPath   string         `yaml:"projectPath,omitempty"`
-	outputPath    string         `yaml:"outputPath,omitempty"`
+	OutputRoot    string         `yaml:"-"`
 }
 
 // Validate checks if the ProjectConfig is valid by ensuring required fields
@@ -51,15 +51,17 @@ func (c *ProjectConfig) FullAudioFilePath() (string, error) {
 	return audioFilePath, nil
 }
 
-func (c *ProjectConfig) OutputPath() string {
-	if c.outputPath != "" {
-		return c.outputPath
-	}
-	home, err := os.UserHomeDir()
-	if err != nil {
-		panic("Could not get user home dir")
+// OutputPath returns the directory below which the m4b is written: OutputRoot,
+// or ~/narr when OutputRoot is empty.
+func (c *ProjectConfig) OutputPath() (string, error) {
+	if c.OutputRoot != "" {
+		return c.OutputRoot, nil
 	}
 
-	c.outputPath = filepath.Join(home, "narr")
-	return c.outputPath
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("could not get user home dir: %w", err)
+	}
+
+	return filepath.Join(home, "narr"), nil
 }

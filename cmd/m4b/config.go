@@ -45,17 +45,9 @@ var checkCmd = &cobra.Command{
 	Short:        "Check config for validity",
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		recursive, _ := cmd.Flags().GetBool("recursive")
-
-		path, err := utils.GetValidFullpathFromArgs(args, 0)
+		projects, err := projectsFromArgs(cmd, args)
 		if err != nil {
-			return fmt.Errorf("could not resolve path %s: %w", args[0], err)
-		}
-
-		projects, err := m4b.NewProjectsByArgs(path, recursive)
-
-		if err != nil {
-			return fmt.Errorf("could not create project(s): %w", err)
+			return err
 		}
 
 		var coverErrors []error
@@ -183,6 +175,12 @@ var filenameCmd = &cobra.Command{
 			return fmt.Errorf("got no projects for path")
 		}
 
+		outputRoot, err := outputRootFromFlag(cmd)
+		if err != nil {
+			return err
+		}
+		projects[0].Config.OutputRoot = outputRoot
+
 		filename, err := projects[0].Filename()
 		if err != nil {
 			return fmt.Errorf("could not get filename: %w", err)
@@ -231,4 +229,6 @@ func init() {
 	checkCmd.AddCommand(metadataCmd)
 	checkCmd.AddCommand(filenameCmd)
 	checkCmd.AddCommand(filesCmd)
+	addOutFlag(checkCmd)
+	addOutFlag(filenameCmd)
 }

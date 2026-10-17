@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
@@ -23,7 +24,6 @@ const (
 
 func TestProject_ConvertToM4B_SineCutIntoWavParts_HasNoGapAtTheSeams(t *testing.T) {
 	requireCommands(t, "ffmpeg", "ffprobe")
-	t.Setenv("HOME", t.TempDir())
 
 	dir := t.TempDir()
 	partSamples := []int{96000, 96000, 96000, 96000, 96000}
@@ -39,7 +39,6 @@ func TestProject_ConvertToM4B_SineCutIntoWavParts_HasNoGapAtTheSeams(t *testing.
 
 func TestProject_ConvertToM4B_M4aPartsWithoutConversion_HasNoGapAtTheSeams(t *testing.T) {
 	requireCommands(t, "ffmpeg", "ffprobe")
-	t.Setenv("HOME", t.TempDir())
 
 	dir := t.TempDir()
 	partSamples := []int{96000, 96000, 96000, 96000, 96000}
@@ -56,7 +55,6 @@ func TestProject_ConvertToM4B_M4aPartsWithoutConversion_HasNoGapAtTheSeams(t *te
 
 func TestProject_ConvertToM4B_OneChapterPerMp3WithoutXingHeader_MarksSitWhereThePartsStart(t *testing.T) {
 	requireCommands(t, "ffmpeg", "ffprobe", "mp4chaps")
-	t.Setenv("HOME", t.TempDir())
 
 	dir := t.TempDir()
 	_, wavParts := sineParts(t, dir, []int{96000, 144000, 120000})
@@ -75,6 +73,37 @@ func TestProject_ConvertToM4B_OneChapterPerMp3WithoutXingHeader_MarksSitWhereThe
 		assert.InDelta(t, float64(decodedBefore)/sampleRate, starts[i], 0.021, "start of chapter %d", i+1)
 		decodedBefore += len(decodeSamples(t, part))
 	}
+}
+
+func TestProject_ConvertToM4B_SetRulesForSeriesAndPartInNarrYaml_WritesThemAsFreeformAtoms(t *testing.T) {
+	requireCommands(t, "ffmpeg", "ffprobe", m4b.AtomicParsleyCommand)
+
+	dir := t.TempDir()
+	_, wavParts := sineParts(t, dir, []int{96000, 96000})
+	encodeParts(t, wavParts, ".flac")
+	coverImage(t, dir)
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "narr.yaml"), []byte(`coverPath: cover.jpg
+shouldConvert: true
+metadataRules:
+  - type: set
+    tag: SERIES
+    value: Die Reihe
+  - type: set
+    tag: PART
+    value: "3"
+`), 0600))
+
+	projects, err := m4b.NewProjectsFromPath(dir)
+	require.NoError(t, err)
+	require.Len(t, projects, 1)
+	projects[0].Config.OutputRoot = t.TempDir()
+
+	result, err := projects[0].ConvertToM4B()
+	require.NoError(t, err)
+
+	atoms := run(t, m4b.AtomicParsleyCommand, result, "-t")
+	assert.Contains(t, atoms, `Atom "----" [com.apple.iTunes;SERIES] contains: Die Reihe`)
+	assert.Contains(t, atoms, `Atom "----" [com.apple.iTunes;PART] contains: 3`)
 }
 
 func encodeParts(t *testing.T, wavParts []string, ext string, codecArgs ...string) []string {
@@ -158,12 +187,9 @@ func sineParts(t *testing.T, dir string, partSamples []int) (string, []string) {
 func realProject(t *testing.T, dir string, parts []string, config m4b.ProjectConfig) *m4b.Project {
 	t.Helper()
 
-	cover := filepath.Join(dir, "cover.jpg")
-	run(t, "ffmpeg", "-v", "error", "-f", "lavfi", "-i", "color=c=red:s=64x64:d=1",
-		"-frames:v", "1", cover)
-
 	config.ProjectPath = dir
-	config.CoverPath = cover
+	config.CoverPath = coverImage(t, dir)
+	config.OutputRoot = t.TempDir()
 
 	processor := m4b.NewFFmpegAudioProcessor()
 	project, err := m4b.NewProjectWithDeps(config, m4b.ProjectDependencies{
@@ -174,6 +200,15 @@ func realProject(t *testing.T, dir string, parts []string, config m4b.ProjectCon
 	require.NoError(t, err)
 
 	return project
+}
+
+func coverImage(t *testing.T, dir string) string {
+	t.Helper()
+
+	cover := filepath.Join(dir, "cover.jpg")
+	run(t, "ffmpeg", "-v", "error", "-f", "lavfi", "-i", "color=c=red:s=64x64:d=1",
+		"-frames:v", "1", cover)
+	return cover
 }
 
 func seams(partSamples []int) []int {
